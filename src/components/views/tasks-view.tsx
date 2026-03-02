@@ -96,7 +96,8 @@ function DroppableColumn({
   PRIORITY_COLORS,
   onArchive,
   onAchievement,
-  onDelete 
+  onDelete,
+  onComplete
 }: { 
   column: typeof COLUMNS[0];
   tasks: Task[];
@@ -105,6 +106,7 @@ function DroppableColumn({
   onArchive: (taskId: string) => void;
   onAchievement: (taskId: string) => void;
   onDelete: (taskId: string) => void;
+  onComplete: (taskId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
 
@@ -133,6 +135,7 @@ function DroppableColumn({
                 onArchive={onArchive}
                 onAchievement={onAchievement}
                 onDelete={onDelete}
+                onComplete={onComplete}
               />
             ))}
             {tasks.length === 0 && (
@@ -211,6 +214,17 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
     const task = tasks.find(t => t.id === taskId);
     if (task && !achievements.find(a => a.id === taskId)) {
       setAchievements(prev => [...prev, { ...task, status: 'done' }]);
+    }
+  };
+
+  const handleComplete = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      onUpdateTask(taskId, { 
+        status: 'done',
+        completedAt: new Date()
+      });
+      // Show a small celebration (could add toast notification here)
     }
   };
 
@@ -403,6 +417,7 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
                 onArchive={handleArchive}
                 onAchievement={handleAchievement}
                 onDelete={onDeleteTask}
+                onComplete={handleComplete}
               />
             ))}
           </div>
@@ -416,6 +431,7 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
                 onArchive={handleArchive}
                 onAchievement={handleAchievement}
                 onDelete={onDeleteTask}
+                onComplete={handleComplete}
               />
             )}
           </DragOverlay>
@@ -433,9 +449,12 @@ interface TaskCardProps {
   onArchive?: (taskId: string) => void;
   onAchievement?: (taskId: string) => void;
   onDelete?: (taskId: string) => void;
+  onComplete?: (taskId: string) => void;
+  onEdit?: (task: Task) => void;
 }
 
-function TaskCard({ task, formatDate, PRIORITY_COLORS, isDragging, onArchive, onAchievement, onDelete }: TaskCardProps) {
+function TaskCard({ task, formatDate, PRIORITY_COLORS, isDragging, onArchive, onAchievement, onDelete, onComplete, onEdit }: TaskCardProps) {
+  const [showDetails, setShowDetails] = useState(false);
   const {
     attributes,
     listeners,
@@ -450,97 +469,200 @@ function TaskCard({ task, formatDate, PRIORITY_COLORS, isDragging, onArchive, on
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`
-        p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)]
-        hover:border-neon-pink hover:shadow-[var(--glow-pink)] transition-all cursor-grab
-        ${isDragging ? 'opacity-50 rotate-2 shadow-lg' : ''}
-      `}
-      {...attributes}
-      {...listeners}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{task.title}</p>
-          {task.description && (
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-              {task.description}
-            </p>
+    <>
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`
+          p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)]
+          hover:border-neon-pink hover:shadow-[var(--glow-pink)] transition-all
+          ${isDragging ? 'opacity-50 rotate-2 shadow-lg' : ''}
+        `}
+      >
+        {/* Drag handle - only this area is draggable */}
+        <div className="flex items-start justify-between gap-2">
+          <div 
+            className="flex-1 min-w-0 cursor-pointer"
+            onClick={() => setShowDetails(true)}
+          >
+            <p className="font-medium truncate">{task.title}</p>
+            {task.description && (
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                {task.description}
+              </p>
+            )}
+          </div>
+          {/* Drag handle icon */}
+          <div 
+            {...attributes} 
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted/20 rounded touch-none"
+          >
+            <GripVertical className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <Badge className={`text-xs ${PRIORITY_COLORS[task.priority]}`}>
+            P{task.priority}
+          </Badge>
+          {task.dueDate && (
+            <Badge variant="outline" className="text-xs flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {formatDate(task.dueDate)}
+            </Badge>
+          )}
+          {task.estimatedMinutes && (
+            <Badge variant="outline" className="text-xs flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {task.estimatedMinutes}m
+            </Badge>
+          )}
+          {task.points > 0 && (
+            <Badge variant="outline" className="text-xs text-neon-yellow border-neon-yellow/30">
+              <Sparkles className="w-3 h-3 mr-1" />
+              +{task.points}
+            </Badge>
           )}
         </div>
-        <GripVertical className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-      </div>
-      
-      <div className="flex flex-wrap items-center gap-2 mt-2">
-        <Badge className={`text-xs ${PRIORITY_COLORS[task.priority]}`}>
-          P{task.priority}
-        </Badge>
-        {task.dueDate && (
-          <Badge variant="outline" className="text-xs flex items-center gap-1">
-            <Calendar className="w-3 h-3" />
-            {formatDate(task.dueDate)}
-          </Badge>
+
+        {task.goal && (
+          <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+            <Target className="w-3 h-3" />
+            {task.goal.title}
+          </div>
         )}
-        {task.estimatedMinutes && (
-          <Badge variant="outline" className="text-xs flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            {task.estimatedMinutes}m
-          </Badge>
-        )}
-      </div>
 
-      {task.goal && (
-        <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-          <Target className="w-3 h-3" />
-          {task.goal.title}
-        </div>
-      )}
-
-      {task.points > 0 && (
-        <div className="flex items-center gap-1 mt-2 text-xs text-neon-yellow">
-          <Sparkles className="w-3 h-3" />
-          +{task.points} points
-        </div>
-      )}
-
-      {/* Action buttons */}
-      <div className="flex items-center gap-1 mt-2 pt-2 border-t border-[var(--border-subtle)]">
-        {task.status === 'done' && (
-          <>
+        {/* Action buttons for ALL tasks */}
+        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-[var(--border-subtle)]">
+          {task.status !== 'done' && task.status !== 'archived' && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-2 text-xs text-muted-foreground hover:text-neon-yellow"
-              onClick={(e) => { e.stopPropagation(); onAchievement?.(task.id); }}
+              className="h-6 px-2 text-xs text-neon-green hover:text-neon-green hover:bg-neon-green/10"
+              onClick={(e) => { e.stopPropagation(); onComplete?.(task.id); }}
             >
-              <Trophy className="w-3 h-3 mr-1" />
-              Trophy
+              <CheckSquare className="w-3 h-3 mr-1" />
+              Done
             </Button>
+          )}
+          {task.status === 'done' && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-neon-yellow"
+                onClick={(e) => { e.stopPropagation(); onAchievement?.(task.id); }}
+              >
+                <Trophy className="w-3 h-3 mr-1" />
+                Trophy
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-muted-foreground"
+                onClick={(e) => { e.stopPropagation(); onArchive?.(task.id); }}
+              >
+                <Archive className="w-3 h-3 mr-1" />
+                Archive
+              </Button>
+            </>
+          )}
+          {task.status === 'archived' && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-2 text-xs text-muted-foreground hover:text-muted-foreground"
-              onClick={(e) => { e.stopPropagation(); onArchive?.(task.id); }}
+              className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+              onClick={(e) => { e.stopPropagation(); onDelete?.(task.id); }}
             >
-              <Archive className="w-3 h-3 mr-1" />
-              Archive
+              <Trash2 className="w-3 h-3 mr-1" />
+              Delete
             </Button>
-          </>
-        )}
-        {task.status === 'archived' && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs text-destructive hover:text-destructive"
-            onClick={(e) => { e.stopPropagation(); onDelete?.(task.id); }}
-          >
-            <Trash2 className="w-3 h-3 mr-1" />
-            Delete
-          </Button>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Task Details Modal */}
+      <Dialog open={showDetails} onOpenChange={setShowDetails}>
+        <DialogContent className="bg-[var(--bg-card)] border-[var(--border-default)] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="gradient-text-dva">{task.title}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {task.description && (
+              <div>
+                <Label className="text-muted-foreground">Description</Label>
+                <p className="mt-1 text-sm">{task.description}</p>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-muted-foreground">Priority</Label>
+                <Badge className={`mt-1 ${PRIORITY_COLORS[task.priority]}`}>
+                  {task.priority === 1 ? 'Low' : task.priority === 2 ? 'Low-Med' : task.priority === 3 ? 'Medium' : task.priority === 4 ? 'High' : 'Critical'}
+                </Badge>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Status</Label>
+                <Badge variant="outline" className="mt-1 capitalize">{task.status}</Badge>
+              </div>
+            </div>
+            {task.dueDate && (
+              <div>
+                <Label className="text-muted-foreground">Due Date</Label>
+                <p className="mt-1 text-sm flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  {formatDate(task.dueDate)}
+                </p>
+              </div>
+            )}
+            {task.estimatedMinutes && (
+              <div>
+                <Label className="text-muted-foreground">Estimated Time</Label>
+                <p className="mt-1 text-sm flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  {task.estimatedMinutes} minutes
+                </p>
+              </div>
+            )}
+            {task.points > 0 && (
+              <div>
+                <Label className="text-muted-foreground">Points</Label>
+                <p className="mt-1 text-sm flex items-center gap-2 text-neon-yellow">
+                  <Sparkles className="w-4 h-4" />
+                  +{task.points} points when completed
+                </p>
+              </div>
+            )}
+            {task.goal && (
+              <div>
+                <Label className="text-muted-foreground">Linked Goal</Label>
+                <p className="mt-1 text-sm flex items-center gap-2">
+                  <Target className="w-4 h-4" />
+                  {task.goal.title}
+                </p>
+              </div>
+            )}
+            <div className="flex gap-2 pt-4">
+              {task.status !== 'done' && task.status !== 'archived' && (
+                <Button 
+                  className="flex-1 btn-neon-primary"
+                  onClick={() => { onComplete?.(task.id); setShowDetails(false); }}
+                >
+                  <CheckSquare className="w-4 h-4 mr-2" />
+                  Mark Done
+                </Button>
+              )}
+              <Button 
+                variant="destructive"
+                onClick={() => { onDelete?.(task.id); setShowDetails(false); }}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

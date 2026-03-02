@@ -41,6 +41,8 @@ model User {
   chatMessages  ChatMessage[]
   pdfDocuments  PdfDocument[]
   tags          Tag[]
+  taskTemplates TaskTemplate[]
+  goalProgress  GoalProgress[]
 
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
@@ -146,7 +148,7 @@ model Task {
   description     String?
 
   // Kanban status
-  status          String        @default("backlog") // "backlog" | "doing" | "done" | "archived"
+  status          String        @default("backlog") // "backlog" | "doing" | "done" | "archived" | "skipped"
 
   // Priority (1-5, 5 being highest)
   priority        Int           @default(3)
@@ -159,7 +161,14 @@ model Task {
   actualMinutes   Int?          // Actual time spent
 
   // Repeating tasks
-  recurrenceRule  String?       // RFC 5545 RRULE string
+  recurrenceRule  String?       // RFC 5545 RRULE string e.g., "FREQ=WEEKLY;BYDAY=MO"
+  recurrenceEnd   DateTime?     // When recurrence ends
+  parentTaskId    String?       // For recurring instances
+  isRecurringInstance Boolean   @default(false)
+  recurringTaskDate DateTime?   // The specific date this instance is for
+
+  // Template reference
+  templateId      String?       // Reference to TaskTemplate if created from template
 
   // Relations
   userId          String
@@ -180,9 +189,13 @@ model Task {
   // Points & Gamification
   points          Int           @default(0)
   completedAt     DateTime?
+  skippedAt       DateTime?     // When task was skipped
 
   // Subtasks (JSON array for flexibility)
   subtasks        String?       // JSON: [{"title": "...", "done": false}]
+  
+  // Category for smart sorting
+  category        String?       // "work" | "personal" | "health" | "finance" | "social"
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -190,6 +203,7 @@ model Task {
   @@index([userId, status])
   @@index([userId, dueDate])
   @@index([userId, goalId])
+  @@index([userId, recurrenceRule])
 }
 
 model TaskDependency {
@@ -231,16 +245,105 @@ model Goal {
   points          Int         @default(100)
   completedAt     DateTime?
 
+  // Recurring Goal Settings
+  isRecurring     Boolean     @default(false)
+  recurrenceType  String?     // "daily" | "weekly" | "monthly"
+  recurrenceDays  String?     // JSON array: ["monday", "wednesday", "friday"]
+  preferredTime   String?     // "morning" | "midday" | "evening" | "any"
+  
+  // Statistics (computed from GoalProgress)
+  totalCompletions Int        @default(0)
+  totalSkips      Int         @default(0)
+  currentStreak   Int         @default(0)
+  longestStreak   Int         @default(0)
+  lastCompletedAt DateTime?
+  lastSkippedAt   DateTime?
+
   // Relations
   userId          String
   user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks           Task[]
   tags            GoalTag[]
+  progress        GoalProgress[]
 
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@index([userId, status])
+  @@index([userId, isRecurring])
+}
+
+// Track daily/weekly progress for recurring goals
+model GoalProgress {
+  id              String      @id @default(cuid())
+  
+  goalId          String
+  goal            Goal        @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // The date this progress entry is for
+  date            DateTime
+  
+  // Status for this date
+  status          String      @default("pending") // "pending" | "completed" | "skipped"
+  completedAt     DateTime?
+  skippedAt       DateTime?
+  
+  // Points earned
+  pointsEarned    Int         @default(0)
+  
+  // Notes
+  notes           String?
+  
+  // Task reference (if a task was created for this)
+  taskId          String?
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([goalId, date])
+  @@index([goalId, date])
+  @@index([userId, date])
+}
+
+// Task Templates for quick task creation
+model TaskTemplate {
+  id              String      @id @default(cuid())
+  
+  title           String
+  description     String?
+  
+  // Default values for new tasks
+  priority        Int         @default(3)
+  estimatedMinutes Int?
+  category        String?
+  
+  // Points for tasks created from this template
+  points          Int         @default(15)
+  
+  // Relations
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Goal to link (optional)
+  goalId          String?
+  
+  // Usage count for sorting by most used
+  useCount        Int         @default(0)
+  
+  // Quick access: pinned templates show in quick add
+  isPinned        Boolean     @default(false)
+  
+  // Icon/emoji for visual identification
+  icon            String?     @default("📋")
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([userId, isPinned])
+  @@index([userId, useCount])
 }
 
 model GoalTag {

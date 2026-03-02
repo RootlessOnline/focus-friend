@@ -23,10 +23,10 @@ export async function GET() {
     }
 
     // Fetch all related data
-    const [tasks, events, transactions, goals, people, documents, chatMessages] = await Promise.all([
+    const [tasks, events, transactions, goals, people, documents, chatMessages, templates] = await Promise.all([
       db.task.findMany({
         where: { userId: DEMO_USER_ID },
-        include: { goal: { select: { title: true } } },
+        include: { goal: { select: { title: true, isRecurring: true } } },
         orderBy: [{ status: 'asc' }, { priority: 'desc' }],
       }),
       db.event.findMany({
@@ -66,6 +66,10 @@ export async function GET() {
         where: { userId: DEMO_USER_ID },
         orderBy: { createdAt: 'asc' },
         take: 50,
+      }),
+      db.taskTemplate.findMany({
+        where: { userId: DEMO_USER_ID },
+        orderBy: [{ isPinned: 'desc' }, { useCount: 'desc' }],
       }),
     ]);
 
@@ -147,6 +151,7 @@ export async function GET() {
       people: formattedPeople,
       documents,
       messages,
+      templates,
       balance,
       warnings,
     });

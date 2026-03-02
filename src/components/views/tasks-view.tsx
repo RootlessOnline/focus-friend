@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,35 +42,86 @@ import {
   Trophy,
   Trash2,
   Star,
-  Undo2,
+  Zap,
+  SkipForward,
+  Timer,
+  Play,
+  Pause,
+  RotateCcw,
+  X,
+  Copy,
+  Flame,
+  ChevronDown,
+  ChevronUp,
+  Edit2,
+  Repeat,
+  Settings,
+  LayoutTemplate,
 } from 'lucide-react';
 
 interface Task {
   id: string;
   title: string;
   description?: string;
-  status: 'backlog' | 'doing' | 'done' | 'archived';
+  status: 'backlog' | 'doing' | 'done' | 'archived' | 'skipped';
   priority: number;
   dueDate?: Date;
   estimatedMinutes?: number;
   points: number;
   goalId?: string;
-  goal?: { title: string };
+  goal?: { title: string; isRecurring?: boolean };
   completedAt?: Date;
+  skippedAt?: Date;
+  isRecurringInstance?: boolean;
+  recurringTaskDate?: Date;
+  category?: string;
+}
+
+interface Goal {
+  id: string;
+  title: string;
+  description?: string;
+  isRecurring?: boolean;
+  recurrenceType?: string;
+  recurrenceDays?: string;
+  preferredTime?: string;
+  totalCompletions?: number;
+  totalSkips?: number;
+  currentStreak?: number;
+  longestStreak?: number;
+  status: string;
+}
+
+interface TaskTemplate {
+  id: string;
+  title: string;
+  description?: string;
+  priority: number;
+  estimatedMinutes?: number;
+  category?: string;
+  points: number;
+  icon?: string;
+  isPinned: boolean;
+  useCount: number;
 }
 
 interface TasksViewProps {
   tasks: Task[];
+  goals?: Goal[];
+  templates?: TaskTemplate[];
   onCreateTask: (task: Partial<Task>) => void;
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
   onDeleteTask: (taskId: string) => void;
+  onCreateTemplate?: (template: Partial<TaskTemplate>) => void;
+  onCreateGoal?: (goal: Partial<Goal>) => void;
 }
 
 const COLUMNS = [
-  { id: 'backlog', title: 'Backlog', color: 'border-l-status-backlog', icon: CheckSquare },
-  { id: 'doing', title: 'Doing', color: 'border-l-status-doing', icon: Clock },
-  { id: 'done', title: 'Done', color: 'border-l-status-done', icon: Target },
-  { id: 'archived', title: 'Archive', color: 'border-l-muted', icon: Archive },
+  { id: 'backlog', title: 'Backlog', color: 'border-l-blue-500', icon: CheckSquare },
+  { id: 'doing', title: 'Doing', color: 'border-l-orange-500', icon: Clock },
+  { id: 'done', title: 'Done', color: 'border-l-green-500', icon: Target },
+  { id: 'skipped', title: 'Skipped', color: 'border-l-yellow-500', icon: SkipForward },
+  { id: 'archived', title: 'Archive', color: 'border-l-gray-500', icon: Archive },
 ];
 
 const PRIORITY_COLORS: Record<number, string> = {
@@ -81,23 +132,115 @@ const PRIORITY_COLORS: Record<number, string> = {
   5: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
 
-// Draggable Task Card Component
+const CATEGORY_ICONS: Record<string, string> = {
+  work: '💼',
+  personal: '🏠',
+  health: '💪',
+  finance: '💰',
+  social: '👥',
+};
+
+// ============================================================================
+// NATURAL LANGUAGE PARSER
+// ============================================================================
+
+function parseNaturalLanguageTask(input: string): Partial<Task> {
+  const lower = input.toLowerCase();
+  
+  // Extract priority (p1-p5, critical, high, medium, low)
+  let priority = 3;
+  if (lower.includes('critical') || lower.includes('urgent') || lower.includes('p5')) priority = 5;
+  else if (lower.includes('high') || lower.includes('important') || lower.includes('p4')) priority = 4;
+  else if (lower.includes('medium') || lower.includes('normal') || lower.includes('p3')) priority = 3;
+  else if (lower.includes('low') || lower.includes('p2')) priority = 2;
+  else if (lower.includes('p1')) priority = 1;
+  
+  // Extract time estimate
+  let estimatedMinutes: number | undefined;
+  const minMatch = input.match(/(\d+)\s*(?:min|minutes?)/i);
+  const hourMatch = input.match(/(\d+)\s*(?:hr|hours?)/i);
+  if (minMatch) estimatedMinutes = parseInt(minMatch[1]);
+  if (hourMatch) estimatedMinutes = (estimatedMinutes || 0) + parseInt(hourMatch[1]) * 60;
+  
+  // Extract due date
+  let dueDate: Date | undefined;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  if (lower.includes('today')) dueDate = new Date();
+  else if (lower.includes('tomorrow')) dueDate = tomorrow;
+  else if (lower.includes('next week')) {
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    dueDate = nextWeek;
+  }
+  
+  // Extract time of day
+  const timeMatch = lower.match(/(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (timeMatch && dueDate) {
+    let hours = parseInt(timeMatch[1]);
+    const meridiem = timeMatch[3]?.toLowerCase();
+    if (meridiem === 'pm' && hours < 12) hours += 12;
+    if (meridiem === 'am' && hours === 12) hours = 0;
+    dueDate.setHours(hours, timeMatch[2] ? parseInt(timeMatch[2]) : 0, 0, 0);
+  }
+  
+  // Extract category
+  let category: string | undefined;
+  if (lower.includes('work')) category = 'work';
+  else if (lower.includes('personal') || lower.includes('home')) category = 'personal';
+  else if (lower.includes('gym') || lower.includes('exercise') || lower.includes('health') || lower.includes('workout')) category = 'health';
+  else if (lower.includes('buy') || lower.includes('pay') || lower.includes('money') || lower.includes('finance')) category = 'finance';
+  else if (lower.includes('meet') || lower.includes('call') || lower.includes('friend')) category = 'social';
+  
+  // Clean title - remove parsed elements
+  let title = input
+    .replace(/\s*(critical|urgent|high|medium|low|important|normal)\s*/gi, ' ')
+    .replace(/\s*p[1-5]\s*/gi, ' ')
+    .replace(/\s*\d+\s*(?:min|minutes?|hr|hours?)\s*/gi, ' ')
+    .replace(/\s*(today|tomorrow|next week)\s*/gi, ' ')
+    .replace(/\s*at\s+\d{1,2}(?::\d{2})?\s*(am|pm)?\s*/gi, ' ')
+    .replace(/\s*(work|personal|home|health|finance|social)\s*/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // Points based on priority
+  const points = priority * 5;
+  
+  return {
+    title: title || input,
+    priority,
+    estimatedMinutes,
+    dueDate,
+    category,
+    points,
+  };
+}
+
+// ============================================================================
+// DRAGGABLE TASK CARD
+// ============================================================================
+
 function DraggableTaskCard({ 
   task, 
   formatDate, 
   onComplete, 
+  onSkip, 
   onArchive, 
   onDelete,
-  onAchievement,
-  isDragging = false 
+  onDuplicate,
+  isDragging = false,
+  speedRunMode = false,
 }: { 
   task: Task;
   formatDate: (date: Date | string) => string;
   onComplete: (taskId: string) => void;
+  onSkip: (taskId: string) => void;
   onArchive: (taskId: string) => void;
   onDelete: (taskId: string) => void;
-  onAchievement: (taskId: string) => void;
+  onDuplicate: (taskId: string) => void;
   isDragging?: boolean;
+  speedRunMode?: boolean;
 }) {
   const [showDetails, setShowDetails] = useState(false);
   
@@ -110,6 +253,8 @@ function DraggableTaskCard({
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : undefined;
 
+  const isRecurringGoalTask = task.goal?.isRecurring;
+
   return (
     <>
       <div
@@ -119,18 +264,24 @@ function DraggableTaskCard({
           p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)]
           hover:border-neon-pink hover:shadow-[var(--glow-pink)] transition-all
           ${isDragging ? 'opacity-30' : ''}
+          ${task.status === 'skipped' ? 'opacity-60 border-l-4 border-l-yellow-500' : ''}
+          ${speedRunMode && task.status === 'doing' ? 'ring-2 ring-neon-cyan animate-pulse' : ''}
         `}
         {...listeners}
         {...attributes}
       >
-        {/* Click to open details */}
         <div 
           className="cursor-pointer"
           onClick={() => !isDragging && setShowDetails(true)}
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{task.title}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-medium truncate">{task.title}</p>
+                {isRecurringGoalTask && (
+                  <Repeat className="w-3 h-3 text-neon-purple flex-shrink-0" />
+                )}
+              </div>
               {task.description && (
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                   {task.description}
@@ -162,6 +313,9 @@ function DraggableTaskCard({
                 +{task.points}
               </Badge>
             )}
+            {task.category && (
+              <span className="text-xs">{CATEGORY_ICONS[task.category]}</span>
+            )}
           </div>
 
           {task.goal && (
@@ -174,16 +328,29 @@ function DraggableTaskCard({
 
         {/* Action buttons */}
         <div className="flex items-center gap-1 mt-2 pt-2 border-t border-[var(--border-subtle)]" onClick={(e) => e.stopPropagation()}>
-          {task.status !== 'done' && task.status !== 'archived' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-xs text-neon-green hover:text-neon-green hover:bg-neon-green/10"
-              onClick={() => onComplete(task.id)}
-            >
-              <CheckSquare className="w-3 h-3 mr-1" />
-              Done
-            </Button>
+          {task.status !== 'done' && task.status !== 'archived' && task.status !== 'skipped' && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-neon-green hover:text-neon-green hover:bg-neon-green/10"
+                onClick={() => onComplete(task.id)}
+              >
+                <CheckSquare className="w-3 h-3 mr-1" />
+                Done
+              </Button>
+              {isRecurringGoalTask && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs text-yellow-500 hover:text-yellow-400 hover:bg-yellow-500/10"
+                  onClick={() => onSkip(task.id)}
+                >
+                  <SkipForward className="w-3 h-3 mr-1" />
+                  Skip
+                </Button>
+              )}
+            </>
           )}
           {task.status === 'done' && (
             <>
@@ -191,7 +358,7 @@ function DraggableTaskCard({
                 variant="ghost"
                 size="sm"
                 className="h-6 px-2 text-xs text-neon-yellow hover:text-neon-yellow"
-                onClick={() => onAchievement(task.id)}
+                onClick={() => {}}
               >
                 <Trophy className="w-3 h-3 mr-1" />
                 Trophy
@@ -206,6 +373,17 @@ function DraggableTaskCard({
                 Archive
               </Button>
             </>
+          )}
+          {task.status === 'skipped' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-neon-green hover:text-neon-green"
+              onClick={() => onComplete(task.id)}
+            >
+              <CheckSquare className="w-3 h-3 mr-1" />
+              Complete
+            </Button>
           )}
           {task.status === 'archived' && (
             <Button
@@ -275,6 +453,12 @@ function DraggableTaskCard({
                 </Button>
               )}
               <Button 
+                variant="outline"
+                onClick={() => { onDuplicate(task.id); setShowDetails(false); }}
+              >
+                <Copy className="w-4 h-4" />
+              </Button>
+              <Button 
                 variant="destructive"
                 onClick={() => { onDelete(task.id); setShowDetails(false); }}
               >
@@ -288,23 +472,30 @@ function DraggableTaskCard({
   );
 }
 
-// Droppable Column Component
+// ============================================================================
+// DROPPABLE COLUMN
+// ============================================================================
+
 function DroppableColumn({ 
   column, 
   tasks, 
   formatDate, 
   onComplete,
+  onSkip,
   onArchive,
   onDelete,
-  onAchievement,
+  onDuplicate,
+  speedRunMode,
 }: { 
   column: typeof COLUMNS[0];
   tasks: Task[];
   formatDate: (date: Date | string) => string;
   onComplete: (taskId: string) => void;
+  onSkip: (taskId: string) => void;
   onArchive: (taskId: string) => void;
   onDelete: (taskId: string) => void;
-  onAchievement: (taskId: string) => void;
+  onDuplicate: (taskId: string) => void;
+  speedRunMode: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ 
     id: column.id,
@@ -323,7 +514,6 @@ function DroppableColumn({
             {tasks.length}
           </Badge>
         </div>
-        {/* Show total points for done column */}
         {column.id === 'done' && tasks.length > 0 && (
           <div className="flex items-center gap-1 mt-1 text-xs text-neon-yellow">
             <Star className="w-3 h-3" />
@@ -340,14 +530,17 @@ function DroppableColumn({
                 task={task}
                 formatDate={formatDate}
                 onComplete={onComplete}
+                onSkip={onSkip}
                 onArchive={onArchive}
                 onDelete={onDelete}
-                onAchievement={onAchievement}
+                onDuplicate={onDuplicate}
+                speedRunMode={speedRunMode}
               />
             ))}
             {tasks.length === 0 && (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 {column.id === 'done' ? 'Complete tasks will appear here~' : 
+                 column.id === 'skipped' ? 'Skipped recurring tasks' :
                  column.id === 'archived' ? 'Archived tasks go here' :
                  'Drag tasks here or create new ones!'}
               </div>
@@ -359,32 +552,267 @@ function DroppableColumn({
   );
 }
 
-export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: TasksViewProps) {
+// ============================================================================
+// SPEED RUN MODE COMPONENT
+// ============================================================================
+
+function SpeedRunMode({ 
+  isActive, 
+  onStart, 
+  onStop, 
+  timer, 
+  completedCount,
+  pointsEarned,
+  currentTask,
+  onCompleteTask,
+}: {
+  isActive: boolean;
+  onStart: (minutes: number) => void;
+  onStop: () => void;
+  timer: number;
+  completedCount: number;
+  pointsEarned: number;
+  currentTask: Task | null;
+  onCompleteTask: () => void;
+}) {
+  const [selectedTime, setSelectedTime] = useState(5);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  if (!isActive) {
+    return (
+      <Card className="bg-gradient-to-r from-neon-pink/10 to-neon-cyan/10 border-neon-pink/30">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-neon-pink/20 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-neon-pink" />
+              </div>
+              <div>
+                <h3 className="font-bold">Speed Run Mode</h3>
+                <p className="text-xs text-muted-foreground">Race against the clock!</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={selectedTime.toString()} onValueChange={(v) => setSelectedTime(parseInt(v))}>
+                <SelectTrigger className="w-20 bg-[var(--bg-card)]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5 min</SelectItem>
+                  <SelectItem value="10">10 min</SelectItem>
+                  <SelectItem value="15">15 min</SelectItem>
+                  <SelectItem value="25">25 min</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={() => onStart(selectedTime)} className="btn-neon-primary">
+                <Play className="w-4 h-4 mr-1" />
+                Start
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-gradient-to-r from-neon-pink/20 to-neon-cyan/20 border-neon-cyan animate-pulse">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">TIME LEFT</p>
+              <p className={`text-3xl font-mono font-bold ${timer < 60 ? 'text-red-400' : 'text-neon-cyan'}`}>
+                {formatTime(timer)}
+              </p>
+            </div>
+            <div className="h-12 w-px bg-border" />
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">COMPLETED</p>
+              <p className="text-3xl font-bold text-neon-green">{completedCount}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">POINTS</p>
+              <p className="text-3xl font-bold text-neon-yellow">{pointsEarned}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {currentTask && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm">Current: <strong>{currentTask.title}</strong></span>
+                <Button onClick={onCompleteTask} size="sm" className="btn-neon-primary">
+                  <CheckSquare className="w-4 h-4 mr-1" />
+                  Done
+                </Button>
+              </div>
+            )}
+            <Button onClick={onStop} variant="destructive" size="sm">
+              <X className="w-4 h-4 mr-1" />
+              Stop
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
+// QUICK ADD BAR
+// ============================================================================
+
+function QuickAddBar({ onAddTask, templates }: { onAddTask: (task: Partial<Task>) => void; templates: TaskTemplate[] }) {
+  const [input, setInput] = useState('');
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    
+    const parsed = parseNaturalLanguageTask(input);
+    onAddTask(parsed);
+    setInput('');
+  };
+
+  const handleTemplateClick = (template: TaskTemplate) => {
+    onAddTask({
+      title: template.title,
+      description: template.description,
+      priority: template.priority,
+      estimatedMinutes: template.estimatedMinutes,
+      category: template.category,
+      points: template.points,
+    });
+    setShowTemplates(false);
+  };
+
+  const pinnedTemplates = templates.filter(t => t.isPinned).slice(0, 5);
+
+  return (
+    <Card className="bg-[var(--bg-surface)] border-[var(--border-default)]">
+      <CardContent className="p-3">
+        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+          <Plus className="w-5 h-5 text-muted-foreground" />
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Add task: 'Buy groceries tomorrow at 5pm high priority'"
+            className="flex-1 bg-[var(--bg-card)] border-[var(--border-default)]"
+          />
+          <Button type="submit" disabled={!input.trim()} className="btn-neon-primary">
+            Add
+          </Button>
+          {pinnedTemplates.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setShowTemplates(!showTemplates)}
+            >
+              <LayoutTemplate className="w-4 h-4" />
+            </Button>
+          )}
+        </form>
+        
+        {/* Templates Dropdown */}
+        {showTemplates && pinnedTemplates.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {pinnedTemplates.map((template) => (
+              <Button
+                key={template.id}
+                variant="outline"
+                size="sm"
+                onClick={() => handleTemplateClick(template)}
+                className="text-xs"
+              >
+                {template.icon} {template.title}
+              </Button>
+            ))}
+          </div>
+        )}
+        
+        <p className="text-xs text-muted-foreground mt-2">
+          💡 Try: "Gym tomorrow at 6pm high priority 1hr" or "Call mom today 15min"
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
+// MAIN TASKS VIEW
+// ============================================================================
+
+export function TasksView({ 
+  tasks, 
+  goals = [], 
+  templates = [],
+  onCreateTask, 
+  onUpdateTask, 
+  onDeleteTask,
+  onCreateTemplate,
+  onCreateGoal,
+}: TasksViewProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
+  const [showGoalStats, setShowGoalStats] = useState<string | null>(null);
   const [achievements, setAchievements] = useState<Task[]>([]);
+  
+  // Speed Run Mode State
+  const [speedRunMode, setSpeedRunMode] = useState(false);
+  const [speedRunTimer, setSpeedRunTimer] = useState(0);
+  const [completedInSpeedRun, setCompletedInSpeedRun] = useState(0);
+  const [pointsInSpeedRun, setPointsInSpeedRun] = useState(0);
+
+  // New Task Form State
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
     priority: 3,
     dueDate: '',
     estimatedMinutes: '',
+    category: '',
+    goalId: '',
+    isRecurring: false,
+    recurrenceType: '',
+    recurrenceDays: [] as string[],
   });
 
-  // Calculate total earned points (from done tasks)
+  // Calculate points
   const totalEarnedPoints = useMemo(() => {
     return tasks
       .filter(t => t.status === 'done')
       .reduce((sum, t) => sum + t.points, 0);
   }, [tasks]);
 
-  // Calculate total pending points (from active tasks)
   const totalPendingPoints = useMemo(() => {
     return tasks
-      .filter(t => t.status !== 'done' && t.status !== 'archived')
+      .filter(t => t.status !== 'done' && t.status !== 'archived' && t.status !== 'skipped')
       .reduce((sum, t) => sum + t.points, 0);
   }, [tasks]);
+
+  // Speed Run Timer Effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (speedRunMode && speedRunTimer > 0) {
+      interval = setInterval(() => {
+        setSpeedRunTimer(prev => {
+          if (prev <= 1) {
+            setSpeedRunMode(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [speedRunMode, speedRunTimer]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -402,26 +830,29 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    // Determine the target column
-    let newStatus: 'backlog' | 'doing' | 'done' | 'archived' | null = null;
+    let newStatus: 'backlog' | 'doing' | 'done' | 'archived' | 'skipped' | null = null;
     
-    // Check if dropped on a column directly
     if (COLUMNS.some(col => col.id === over.id)) {
-      newStatus = over.id as 'backlog' | 'doing' | 'done' | 'archived';
+      newStatus = over.id as 'backlog' | 'doing' | 'done' | 'archived' | 'skipped';
     } else {
-      // Dropped on a task - find which column that task is in
       const targetTask = tasks.find(t => t.id === over.id);
       if (targetTask && targetTask.status !== task.status) {
         newStatus = targetTask.status;
       }
     }
 
-    // Update if status changed
     if (newStatus && task.status !== newStatus) {
       onUpdateTask(taskId, { 
         status: newStatus,
-        ...(newStatus === 'done' ? { completedAt: new Date() } : {})
+        ...(newStatus === 'done' ? { completedAt: new Date() } : {}),
+        ...(newStatus === 'skipped' ? { skippedAt: new Date() } : {}),
       });
+      
+      // Speed Run Mode tracking
+      if (speedRunMode && newStatus === 'done') {
+        setCompletedInSpeedRun(prev => prev + 1);
+        setPointsInSpeedRun(prev => prev + task.points);
+      }
     }
   };
 
@@ -432,15 +863,52 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
       priority: newTask.priority,
       dueDate: newTask.dueDate ? new Date(newTask.dueDate) : undefined,
       estimatedMinutes: newTask.estimatedMinutes ? parseInt(newTask.estimatedMinutes) : undefined,
+      category: newTask.category || undefined,
+      goalId: newTask.goalId || undefined,
     });
-    setNewTask({ title: '', description: '', priority: 3, dueDate: '', estimatedMinutes: '' });
+    
+    // If recurring, create a goal too
+    if (newTask.isRecurring && newTask.recurrenceType && onCreateGoal) {
+      onCreateGoal({
+        title: newTask.title,
+        isRecurring: true,
+        recurrenceType: newTask.recurrenceType,
+        recurrenceDays: JSON.stringify(newTask.recurrenceDays),
+      });
+    }
+    
+    setNewTask({ 
+      title: '', 
+      description: '', 
+      priority: 3, 
+      dueDate: '', 
+      estimatedMinutes: '',
+      category: '',
+      goalId: '',
+      isRecurring: false,
+      recurrenceType: '',
+      recurrenceDays: [],
+    });
     setIsCreateOpen(false);
   };
 
   const handleComplete = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
     onUpdateTask(taskId, { 
       status: 'done',
       completedAt: new Date()
+    });
+    
+    if (speedRunMode && task) {
+      setCompletedInSpeedRun(prev => prev + 1);
+      setPointsInSpeedRun(prev => prev + task.points);
+    }
+  };
+
+  const handleSkip = (taskId: string) => {
+    onUpdateTask(taskId, { 
+      status: 'skipped',
+      skippedAt: new Date()
     });
   };
 
@@ -448,10 +916,49 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
     onUpdateTask(taskId, { status: 'archived' });
   };
 
-  const handleAchievement = (taskId: string) => {
+  const handleDuplicate = (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
-    if (task && !achievements.find(a => a.id === taskId)) {
-      setAchievements(prev => [...prev, task]);
+    if (task) {
+      onCreateTask({
+        title: `Copy: ${task.title}`,
+        description: task.description,
+        priority: task.priority,
+        dueDate: task.dueDate,
+        estimatedMinutes: task.estimatedMinutes,
+        category: task.category,
+        points: task.points,
+      });
+    }
+  };
+
+  const handleStartSpeedRun = (minutes: number) => {
+    setSpeedRunMode(true);
+    setSpeedRunTimer(minutes * 60);
+    setCompletedInSpeedRun(0);
+    setPointsInSpeedRun(0);
+    
+    // Move first task in backlog to doing
+    const firstTask = tasks.find(t => t.status === 'backlog');
+    if (firstTask) {
+      onUpdateTask(firstTask.id, { status: 'doing' });
+    }
+  };
+
+  const handleStopSpeedRun = () => {
+    setSpeedRunMode(false);
+    setSpeedRunTimer(0);
+  };
+
+  const handleSpeedRunComplete = () => {
+    const doingTask = tasks.find(t => t.status === 'doing');
+    if (doingTask) {
+      handleComplete(doingTask.id);
+      
+      // Move next backlog task to doing
+      const nextTask = tasks.find(t => t.status === 'backlog');
+      if (nextTask) {
+        onUpdateTask(nextTask.id, { status: 'doing' });
+      }
     }
   };
 
@@ -469,10 +976,14 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
   };
 
   const getTasksByStatus = (status: string) => tasks.filter(t => t.status === status);
+  
+  const currentSpeedRunTask = speedRunMode ? tasks.find(t => t.status === 'doing') : null;
+
+  const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] lg:h-screen">
-      {/* Header with Points Display */}
+      {/* Header with Points */}
       <div className="flex items-center justify-between p-4 lg:p-6 border-b border-[var(--border-subtle)]">
         <div className="flex items-center gap-4">
           <div>
@@ -480,7 +991,6 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
             <p className="text-sm text-muted-foreground">Drag and drop to organize~ :3</p>
           </div>
           
-          {/* Points Display */}
           <div className="flex items-center gap-3 ml-4">
             <Card className="px-3 py-2 bg-neon-yellow/10 border-neon-yellow/30">
               <div className="flex items-center gap-2">
@@ -500,6 +1010,17 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
                 </div>
               </div>
             </Card>
+            {speedRunMode && (
+              <Card className="px-3 py-2 bg-neon-cyan/10 border-neon-cyan/30 animate-pulse">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-5 h-5 text-neon-cyan" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Speed Run</p>
+                    <p className="text-lg font-bold text-neon-cyan">{completedInSpeedRun} 🔥</p>
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
         </div>
         
@@ -510,7 +1031,7 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
             className="border-neon-yellow text-neon-yellow hover:bg-neon-yellow/10"
           >
             <Trophy className="w-4 h-4 mr-2" />
-            Trophies ({achievements.length})
+            Trophies
           </Button>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
@@ -519,7 +1040,7 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
                 Add Task
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-[var(--bg-card)] border-[var(--border-default)]">
+            <DialogContent className="bg-[var(--bg-card)] border-[var(--border-default)] max-w-lg">
               <DialogHeader>
                 <DialogTitle className="gradient-text-dva">Create New Task</DialogTitle>
               </DialogHeader>
@@ -562,6 +1083,26 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
                     </Select>
                   </div>
                   <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select
+                      value={newTask.category}
+                      onValueChange={(v) => setNewTask({ ...newTask, category: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="work">💼 Work</SelectItem>
+                        <SelectItem value="personal">🏠 Personal</SelectItem>
+                        <SelectItem value="health">💪 Health</SelectItem>
+                        <SelectItem value="finance">💰 Finance</SelectItem>
+                        <SelectItem value="social">👥 Social</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
                     <Label>Due Date</Label>
                     <Input
                       type="date"
@@ -569,16 +1110,103 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
                       onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Estimated Time (min)</Label>
+                    <Input
+                      type="number"
+                      value={newTask.estimatedMinutes}
+                      onChange={(e) => setNewTask({ ...newTask, estimatedMinutes: e.target.value })}
+                      placeholder="e.g., 30"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Estimated Time (minutes)</Label>
-                  <Input
-                    type="number"
-                    value={newTask.estimatedMinutes}
-                    onChange={(e) => setNewTask({ ...newTask, estimatedMinutes: e.target.value })}
-                    placeholder="e.g., 30"
-                  />
+                
+                {/* Recurring Task Section */}
+                <div className="space-y-2 pt-2 border-t border-[var(--border-subtle)]">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="recurring"
+                      checked={newTask.isRecurring}
+                      onChange={(e) => setNewTask({ ...newTask, isRecurring: e.target.checked })}
+                      className="rounded"
+                    />
+                    <Label htmlFor="recurring" className="flex items-center gap-2">
+                      <Repeat className="w-4 h-4" />
+                      Make this a recurring task
+                    </Label>
+                  </div>
+                  
+                  {newTask.isRecurring && (
+                    <div className="space-y-3 pl-6">
+                      <div className="space-y-2">
+                        <Label>Repeat</Label>
+                        <Select
+                          value={newTask.recurrenceType}
+                          onValueChange={(v) => setNewTask({ ...newTask, recurrenceType: v })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="daily">Daily</SelectItem>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {newTask.recurrenceType === 'weekly' && (
+                        <div className="space-y-2">
+                          <Label>On which days?</Label>
+                          <div className="flex flex-wrap gap-2">
+                            {DAYS.map((day) => (
+                              <Button
+                                key={day}
+                                type="button"
+                                variant={newTask.recurrenceDays.includes(day) ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => {
+                                  const days = newTask.recurrenceDays.includes(day)
+                                    ? newTask.recurrenceDays.filter(d => d !== day)
+                                    : [...newTask.recurrenceDays, day];
+                                  setNewTask({ ...newTask, recurrenceDays: days });
+                                }}
+                                className={newTask.recurrenceDays.includes(day) ? 'btn-neon-primary' : ''}
+                              >
+                                {day.slice(0, 3)}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
+                
+                {/* Link to Goal */}
+                {goals.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Link to Goal (optional)</Label>
+                    <Select
+                      value={newTask.goalId}
+                      onValueChange={(v) => setNewTask({ ...newTask, goalId: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a goal..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {goals.filter(g => g.status === 'active').map((goal) => (
+                          <SelectItem key={goal.id} value={goal.id}>
+                            {goal.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                
                 <Button 
                   onClick={handleCreateTask} 
                   className="w-full btn-neon-primary"
@@ -592,6 +1220,107 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
         </div>
       </div>
 
+      {/* Speed Run Mode Bar */}
+      <div className="px-4 lg:px-6 pt-4">
+        <SpeedRunMode
+          isActive={speedRunMode}
+          onStart={handleStartSpeedRun}
+          onStop={handleStopSpeedRun}
+          timer={speedRunTimer}
+          completedCount={completedInSpeedRun}
+          pointsEarned={pointsInSpeedRun}
+          currentTask={currentSpeedRunTask}
+          onCompleteTask={handleSpeedRunComplete}
+        />
+      </div>
+
+      {/* Quick Add Bar */}
+      <div className="px-4 lg:px-6 pt-4">
+        <QuickAddBar onAddTask={onCreateTask} templates={templates} />
+      </div>
+
+      {/* Goal Stats Modal */}
+      {showGoalStats && (
+        <Dialog open={!!showGoalStats} onOpenChange={() => setShowGoalStats(null)}>
+          <DialogContent className="bg-[var(--bg-card)] border-[var(--border-default)] max-w-md">
+            <DialogHeader>
+              <DialogTitle className="gradient-text-dva flex items-center gap-2">
+                <Target className="w-5 h-5" />
+                Goal Statistics
+              </DialogTitle>
+            </DialogHeader>
+            {(() => {
+              const goal = goals.find(g => g.id === showGoalStats);
+              if (!goal) return null;
+              
+              const completionRate = goal.totalCompletions && (goal.totalCompletions + (goal.totalSkips || 0)) > 0
+                ? Math.round((goal.totalCompletions / (goal.totalCompletions + (goal.totalSkips || 0))) * 100)
+                : 0;
+              
+              return (
+                <div className="space-y-4 py-4">
+                  <div className="text-center">
+                    <h3 className="text-xl font-bold">{goal.title}</h3>
+                    {goal.isRecurring && (
+                      <Badge className="mt-1 bg-neon-purple/20 text-neon-purple">
+                        <Repeat className="w-3 h-3 mr-1" />
+                        Recurring {goal.recurrenceType}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <Card className="p-3 bg-green-500/10 border-green-500/30 text-center">
+                      <CheckSquare className="w-6 h-6 mx-auto text-green-400" />
+                      <p className="text-2xl font-bold text-green-400">{goal.totalCompletions || 0}</p>
+                      <p className="text-xs text-muted-foreground">Completed</p>
+                    </Card>
+                    <Card className="p-3 bg-yellow-500/10 border-yellow-500/30 text-center">
+                      <SkipForward className="w-6 h-6 mx-auto text-yellow-400" />
+                      <p className="text-2xl font-bold text-yellow-400">{goal.totalSkips || 0}</p>
+                      <p className="text-xs text-muted-foreground">Skipped</p>
+                    </Card>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Completion Rate</span>
+                      <span className="font-bold">{completionRate}%</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div 
+                        className="bg-gradient-to-r from-neon-green to-neon-cyan h-2 rounded-full transition-all"
+                        style={{ width: `${completionRate}%` }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <Card className="p-3 bg-neon-cyan/10 border-neon-cyan/30 text-center">
+                      <Flame className="w-5 h-5 mx-auto text-neon-cyan" />
+                      <p className="text-xl font-bold">{goal.currentStreak || 0}</p>
+                      <p className="text-xs text-muted-foreground">Current Streak</p>
+                    </Card>
+                    <Card className="p-3 bg-neon-yellow/10 border-neon-yellow/30 text-center">
+                      <Trophy className="w-5 h-5 mx-auto text-neon-yellow" />
+                      <p className="text-xl font-bold">{goal.longestStreak || 0}</p>
+                      <p className="text-xs text-muted-foreground">Longest Streak</p>
+                    </Card>
+                  </div>
+                  
+                  {goal.description && (
+                    <div>
+                      <Label className="text-muted-foreground">Description</Label>
+                      <p className="text-sm mt-1">{goal.description}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Achievements Modal */}
       {showAchievements && (
         <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -600,7 +1329,7 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Trophy className="w-6 h-6 text-neon-yellow" />
-                  <CardTitle className="gradient-text-dva">My Trophy Case</CardTitle>
+                  <CardTitle className="gradient-text-dva">Trophy Case</CardTitle>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setShowAchievements(false)}>
                   ×
@@ -611,7 +1340,7 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
               {achievements.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Trophy className="w-12 h-12 mx-auto mb-2 opacity-30" />
-                  <p>No trophies yet! Click the trophy icon on completed tasks to add them to your collection.</p>
+                  <p>No trophies yet! Click the trophy icon on completed tasks.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -626,17 +1355,9 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
                         </div>
                         <div>
                           <p className="font-medium">{task.title}</p>
-                          <p className="text-xs text-neon-yellow">+{task.points} points earned</p>
+                          <p className="text-xs text-neon-yellow">+{task.points} points</p>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setAchievements(prev => prev.filter(a => a.id !== task.id))}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
                     </div>
                   ))}
                 </div>
@@ -652,7 +1373,7 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 h-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 h-full">
             {COLUMNS.map((column) => (
               <DroppableColumn
                 key={column.id}
@@ -660,9 +1381,11 @@ export function TasksView({ tasks, onCreateTask, onUpdateTask, onDeleteTask }: T
                 tasks={getTasksByStatus(column.id)}
                 formatDate={formatDate}
                 onComplete={handleComplete}
+                onSkip={handleSkip}
                 onArchive={handleArchive}
                 onDelete={onDeleteTask}
-                onAchievement={handleAchievement}
+                onDuplicate={handleDuplicate}
+                speedRunMode={speedRunMode}
               />
             ))}
           </div>

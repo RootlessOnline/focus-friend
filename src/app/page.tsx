@@ -17,13 +17,28 @@ interface Task {
   id: string;
   title: string;
   description?: string;
-  status: 'backlog' | 'doing' | 'done';
+  status: 'backlog' | 'doing' | 'done' | 'skipped' | 'archived';
   priority: number;
   dueDate?: Date;
   estimatedMinutes?: number;
   points: number;
   goalId?: string;
-  goal?: { title: string };
+  goal?: { title: string; isRecurring?: boolean };
+  category?: string;
+  isRecurringInstance?: boolean;
+}
+
+interface TaskTemplate {
+  id: string;
+  title: string;
+  description?: string;
+  priority: number;
+  estimatedMinutes?: number;
+  category?: string;
+  points: number;
+  icon?: string;
+  isPinned: boolean;
+  useCount: number;
 }
 
 interface Event {
@@ -64,6 +79,13 @@ interface Goal {
   status: string;
   points: number;
   tasks: { id: string; title: string; status: string; points: number }[];
+  isRecurring?: boolean;
+  recurrenceType?: string;
+  recurrenceDays?: string;
+  totalCompletions?: number;
+  totalSkips?: number;
+  currentStreak?: number;
+  longestStreak?: number;
 }
 
 interface Person {
@@ -114,6 +136,7 @@ export default function Home() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [documents, setDocuments] = useState<PdfDocument[]>([]);
+  const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [balance, setBalance] = useState(100);
   const [warnings, setWarnings] = useState<string[]>([]);
 
@@ -172,6 +195,7 @@ export default function Home() {
         setGoals(data.goals || []);
         setPeople(data.people || []);
         setDocuments(data.documents || []);
+        setTemplates(data.templates || []);
         setBalance(data.balance || 100);
         setWarnings(data.warnings || []);
         setMessages(data.messages || []);
@@ -665,9 +689,12 @@ export default function Home() {
         return (
           <TasksView
             tasks={tasks}
+            goals={goals}
+            templates={templates}
             onCreateTask={handleCreateTask}
             onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
+            onCreateGoal={handleCreateGoal}
           />
         );
       case 'goals':

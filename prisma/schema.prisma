@@ -1,0 +1,510 @@
+// ADHD Assistant - Comprehensive Database Schema
+// A playful, interconnected life management system :3
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER & SETTINGS
+// ============================================================================
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  name          String?
+  displayName   String?    // For the cute gamer name :3
+  avatar        String?    // URL to avatar
+  pronouns      String?    // e.g., "she/her"
+
+  // Preferences
+  morningStart  Int        @default(8)   // Hour (0-23) for morning preference
+  middayStart   Int        @default(12)  // Hour for midday preference
+  eveningStart  Int        @default(18)  // Hour for evening preference
+  timezone      String     @default("America/New_York")
+  currency      String     @default("USD")
+  theme         String     @default("neon-gamer") // Theme preference
+
+  // Relations
+  events        Event[]
+  tasks         Task[]
+  goals         Goal[]
+  transactions  Transaction[]
+  debts         Debt[]
+  people        Person[]
+  achievements  UserAchievement[]
+  chatMessages  ChatMessage[]
+  pdfDocuments  PdfDocument[]
+  tags          Tag[]
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Tag {
+  id          String   @id @default(cuid())
+  name        String
+  color       String   @default("#ff69b4") // Neon pink default :3
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Polymorphic relations via junction tables
+  taskTags    TaskTag[]
+  eventTags   EventTag[]
+  goalTags    GoalTag[]
+
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, name])
+}
+
+// ============================================================================
+// CALENDAR & EVENTS
+// ============================================================================
+
+model Event {
+  id              String        @id @default(cuid())
+  title           String
+  description     String?
+
+  // Timing
+  startDate       DateTime
+  endDate         DateTime?
+  isAllDay        Boolean       @default(false)
+
+  // Recurrence (RRULE format - RFC 5545)
+  recurrenceRule  String?       // e.g., "FREQ=WEEKLY;BYDAY=MO,FR"
+  recurrenceEnd   DateTime?     // When recurrence ends
+  parentEventId   String?       // For recurrence instances
+  parentEvent     Event?        @relation("Recurrence", fields: [parentEventId], references: [id])
+  recurringEvents Event[]       @relation("Recurrence")
+
+  // Time preferences for smart scheduling
+  preferredTime   String?       // "morning" | "midday" | "evening" | "any"
+
+  // Smart scheduling
+  isFlexible      Boolean       @default(false) // Can be rescheduled by AI
+  duration        Int?          // Duration in minutes (for flexible events)
+
+  // Relations
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Links to other entities
+  transactions    Transaction[]
+  tasks           Task[]
+  people          EventPerson[]
+  tags            EventTag[]
+
+  // Status
+  status          String        @default("confirmed") // "tentative" | "confirmed" | "cancelled"
+  reminderMinutes Int?          // Minutes before to remind
+
+  // Metadata
+  color           String?       // Event color (for calendar display)
+  location        String?
+  url             String?       // Link to online event
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([userId, startDate])
+  @@index([userId, status])
+}
+
+model EventPerson {
+  eventId     String
+  personId    String
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  person      Person      @relation(fields: [personId], references: [id], onDelete: Cascade)
+  role        String?     // "organizer" | "attendee" | etc.
+
+  @@id([eventId, personId])
+}
+
+model EventTag {
+  eventId     String
+  tagId       String
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tag         Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, tagId])
+}
+
+// ============================================================================
+// TASKS & GOALS
+// ============================================================================
+
+model Task {
+  id              String        @id @default(cuid())
+  title           String
+  description     String?
+
+  // Kanban status
+  status          String        @default("backlog") // "backlog" | "doing" | "done" | "archived"
+
+  // Priority (1-5, 5 being highest)
+  priority        Int           @default(3)
+  aiSuggestedPriority Int?      // AI's suggested priority
+
+  // Timing
+  dueDate         DateTime?
+  dueTime         String?       // "HH:mm" format
+  estimatedMinutes Int?         // Time estimate
+  actualMinutes   Int?          // Actual time spent
+
+  // Repeating tasks
+  recurrenceRule  String?       // RFC 5545 RRULE string
+
+  // Relations
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Links
+  goalId          String?
+  goal            Goal?         @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  eventId         String?
+  event           Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  transactions    Transaction[]
+  tags            TaskTag[]
+
+  // Dependencies
+  dependsOn       TaskDependency[]  @relation("TaskDependsOn")
+  dependedBy      TaskDependency[]  @relation("TaskDependedBy")
+
+  // Points & Gamification
+  points          Int           @default(0)
+  completedAt     DateTime?
+
+  // Subtasks (JSON array for flexibility)
+  subtasks        String?       // JSON: [{"title": "...", "done": false}]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, dueDate])
+  @@index([userId, goalId])
+}
+
+model TaskDependency {
+  taskId          String
+  dependsOnTaskId String
+  task            Task          @relation("TaskDependsOn", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOnTask   Task          @relation("TaskDependedBy", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, dependsOnTaskId])
+}
+
+model TaskTag {
+  taskId      String
+  tagId       String
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag         Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+}
+
+model Goal {
+  id              String      @id @default(cuid())
+  title           String
+  description     String?
+
+  // Progress tracking
+  targetValue     Float?
+  currentValue    Float       @default(0)
+  unit            String?     // e.g., "pages", "hours", "tasks"
+
+  // Timing
+  startDate       DateTime?
+  targetDate      DateTime?
+
+  // Status
+  status          String      @default("active") // "active" | "completed" | "paused" | "abandoned"
+
+  // Points for completion
+  points          Int         @default(100)
+  completedAt     DateTime?
+
+  // Relations
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks           Task[]
+  tags            GoalTag[]
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([userId, status])
+}
+
+model GoalTag {
+  goalId      String
+  tagId       String
+  goal        Goal        @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  tag         Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([goalId, tagId])
+}
+
+// ============================================================================
+// FINANCES
+// ============================================================================
+
+model Transaction {
+  id              String      @id @default(cuid())
+
+  // Amount (negative for expenses, positive for income)
+  amount          Float
+
+  // Description & category
+  description     String
+  category        String      @default("uncategorized")
+  // Categories: "income", "groceries", "bills", "entertainment",
+  // "transport", "health", "shopping", "subscription", "debt-payment"
+
+  // Relations
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Links to other entities
+  eventId         String?
+  event           Event?      @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  taskId          String?
+  task            Task?       @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  debtId          String?
+  debt            Debt?       @relation(fields: [debtId], references: [id], onDelete: SetNull)
+
+  // Recurring transactions
+  recurrenceRule  String?     // RFC 5545 RRULE string
+  recurrenceEnd   DateTime?
+  parentTransactionId String?
+  parentTransaction Transaction? @relation("RecurringTransaction", fields: [parentTransactionId], references: [id])
+  recurringTransactions Transaction[] @relation("RecurringTransaction")
+
+  // Metadata
+  date            DateTime    @default(now())
+  isReconciled    Boolean     @default(false)
+  notes           String?
+  receipt         String?     // URL to receipt image/PDF
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, category])
+}
+
+model Debt {
+  id              String        @id @default(cuid())
+
+  // Debt info
+  name            String        // Who/what it's for
+  person          String?       // Who the debt is to/from
+  isOwed          Boolean       // true = someone owes you, false = you owe someone
+
+  // Amount
+  originalAmount  Float         // Original debt amount
+  currentAmount   Float         // Remaining balance
+
+  // Interest (optional)
+  interestRate    Float?
+  interestType    String?       // "simple" | "compound"
+
+  // Timing
+  startDate       DateTime      @default(now())
+  dueDate         DateTime?
+
+  // Status
+  status          String        @default("active") // "active" | "paid" | "forgiven" | "defaulted"
+
+  // Relations
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments        Transaction[]
+
+  // Reminders
+  reminderDays    Int?          // Days before due date to remind
+
+  notes           String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, dueDate])
+}
+
+// ============================================================================
+// PEOPLE TRACKER
+// ============================================================================
+
+model Person {
+  id              String        @id @default(cuid())
+
+  // Basic info
+  name            String
+  nickname        String?
+  avatar          String?       // URL to avatar/image
+
+  // Relationship
+  relationship     String?      // "friend" | "family" | "partner" | "colleague" | "other"
+  howWeMet        String?       // Notes on how you met
+  importantDates  String?       // JSON: [{"type": "birthday", "date": "1990-01-15"}]
+
+  // Contact info
+  email           String?
+  phone           String?
+  socialLinks     String?       // JSON: [{"platform": "discord", "handle": "..."}]
+
+  // Notes
+  notes           String?       // General notes about the person
+
+  // Relations
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events          EventPerson[]
+
+  // Interaction tracking
+  lastContactDate DateTime?
+  contactFrequency String?      // "daily" | "weekly" | "monthly" | "rarely"
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId, lastContactDate])
+}
+
+// ============================================================================
+// CHAT & AI
+// ============================================================================
+
+model ChatMessage {
+  id              String      @id @default(cuid())
+
+  // Message content
+  role            String      // "user" | "assistant" | "system"
+  content         String
+
+  // Context tracking
+  contextType     String?     // "task" | "event" | "finance" | "goal" | "person" | "general"
+  referencedEntities String?  // JSON: [{"type": "task", "id": "..."}]
+
+  // Actions taken by AI
+  actionsTaken    String?     // JSON: [{"action": "create_task", "taskId": "..."}]
+
+  // Relations
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Threading (for context)
+  threadId        String?     // For grouping related messages
+  parentMessageId String?
+
+  createdAt       DateTime    @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, threadId])
+}
+
+// ============================================================================
+// PDF & DOCUMENTS (Bionic Reading)
+// ============================================================================
+
+model PdfDocument {
+  id              String      @id @default(cuid())
+
+  // File info
+  originalName    String
+  storedPath      String      // Path to stored PDF
+  processedPath   String?     // Path to bionic-processed PDF
+
+  // Processing status
+  status          String      @default("pending") // "pending" | "processing" | "ready" | "error"
+  error           String?
+
+  // Bionic reading settings
+  boldRatio       Float       @default(0.5)    // How much of word to bold
+  fontSize        Int         @default(12)
+
+  // Metadata
+  pageCount       Int?
+  wordCount       Int?
+
+  // Relations
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([userId, status])
+}
+
+// ============================================================================
+// ACHIEVEMENTS & GAMIFICATION
+// ============================================================================
+
+model Achievement {
+  id              String      @id @default(cuid())
+
+  // Achievement info
+  name            String
+  description     String
+  icon            String      // Emoji or icon name
+  category        String      // "tasks" | "goals" | "finance" | "social" | "streak"
+
+  // Requirements
+  requirementType String      // "count" | "streak" | "points"
+  requirementValue Int
+
+  // Rewards
+  points          Int         @default(0)
+
+  // Relations
+  userAchievements UserAchievement[]
+
+  createdAt       DateTime    @default(now())
+
+  @@unique([name])
+}
+
+model UserAchievement {
+  id              String      @id @default(cuid())
+
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  achievementId   String
+  achievement     Achievement @relation(fields: [achievementId], references: [id])
+
+  earnedAt        DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+}
+
+// ============================================================================
+// SYSTEM & SYNC (Future Google Integration)
+// ============================================================================
+
+model SyncToken {
+  id              String      @id @default(cuid())
+
+  // For Google Calendar sync
+  provider        String      // "google-calendar" | "google-tasks"
+  accessToken     String
+  refreshToken    String
+  expiresAt       DateTime
+
+  userId          String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([userId, provider])
+}

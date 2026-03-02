@@ -1,0 +1,734 @@
+/**
+ * Neon Gamer Theme - D.Va/Jinx/Harley Quinn Inspired :3
+ * 
+ * A vibrant, playful theme designed for ADHD-friendly interfaces
+ * with neon glows and gamer aesthetic
+ */
+
+/* ============================================================================
+   CSS CUSTOM PROPERTIES - NEON GAMER PALETTE
+   ============================================================================ */
+
+:root {
+  /* Core Neon Colors - The signature palette */
+  --neon-pink: oklch(0.75 0.22 350);
+  --neon-pink-bright: oklch(0.82 0.24 350);
+  --neon-cyan: oklch(0.80 0.16 195);
+  --neon-cyan-bright: oklch(0.88 0.18 195);
+  --neon-purple: oklch(0.65 0.24 290);
+  --neon-purple-bright: oklch(0.72 0.26 290);
+  --neon-yellow: oklch(0.90 0.18 85);
+  --neon-green: oklch(0.75 0.20 145);
+  --neon-red: oklch(0.65 0.24 25);
+  --neon-orange: oklch(0.75 0.18 50);
+  
+  /* Background Colors - Deep space vibes */
+  --bg-darkest: oklch(0.06 0.02 285);
+  --bg-darker: oklch(0.10 0.03 285);
+  --bg-dark: oklch(0.14 0.03 285);
+  --bg-card: oklch(0.18 0.04 285);
+  --bg-card-hover: oklch(0.22 0.04 285);
+  --bg-card-active: oklch(0.26 0.04 285);
+  --bg-surface: oklch(0.12 0.02 285);
+  
+  /* Text Colors */
+  --text-primary: oklch(0.96 0.01 285);
+  --text-secondary: oklch(0.78 0.02 285);
+  --text-muted: oklch(0.58 0.02 285);
+  --text-disabled: oklch(0.40 0.02 285);
+  
+  /* Border Colors */
+  --border-subtle: oklch(0.30 0.02 285);
+  --border-default: oklch(0.35 0.03 285);
+  --border-strong: oklch(0.45 0.04 285);
+  
+  /* Glow Effects - The magic! */
+  --glow-pink: 0 0 20px oklch(0.75 0.22 350 / 40%), 0 0 40px oklch(0.75 0.22 350 / 20%);
+  --glow-cyan: 0 0 20px oklch(0.80 0.16 195 / 40%), 0 0 40px oklch(0.80 0.16 195 / 20%);
+  --glow-purple: 0 0 20px oklch(0.65 0.24 290 / 40%), 0 0 40px oklch(0.65 0.24 290 / 20%);
+  --glow-yellow: 0 0 20px oklch(0.90 0.18 85 / 40%), 0 0 40px oklch(0.90 0.18 85 / 20%);
+  --glow-green: 0 0 20px oklch(0.75 0.20 145 / 40%), 0 0 40px oklch(0.75 0.20 145 / 20%);
+  --glow-red: 0 0 20px oklch(0.65 0.24 25 / 40%), 0 0 40px oklch(0.65 0.24 25 / 20%);
+  
+  /* Text Glows */
+  --text-glow-pink: 0 0 10px oklch(0.75 0.22 350 / 60%);
+  --text-glow-cyan: 0 0 10px oklch(0.80 0.16 195 / 60%);
+  --text-glow-purple: 0 0 10px oklch(0.65 0.24 290 / 60%);
+  
+  /* Gradients - For buttons and accents */
+  --gradient-dva: linear-gradient(135deg, var(--neon-pink) 0%, var(--neon-cyan) 100%);
+  --gradient-jinx: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 100%);
+  --gradient-harley: linear-gradient(135deg, var(--neon-pink) 0%, var(--neon-purple) 50%, var(--neon-cyan) 100%);
+  --gradient-sunset: linear-gradient(135deg, var(--neon-orange) 0%, var(--neon-pink) 100%);
+  --gradient-aurora: linear-gradient(135deg, var(--neon-green) 0%, var(--neon-cyan) 50%, var(--neon-purple) 100%);
+  
+  /* Semantic Colors - Status indicators */
+  --status-backlog: oklch(0.60 0.12 250);
+  --status-doing: oklch(0.75 0.18 50);
+  --status-done: var(--neon-green);
+  --status-archived: oklch(0.50 0.05 285);
+  
+  /* Priority Colors */
+  --priority-critical: var(--neon-red);
+  --priority-high: var(--neon-orange);
+  --priority-medium: var(--neon-yellow);
+  --priority-low: var(--neon-cyan);
+  --priority-backlog: oklch(0.55 0.08 250);
+  
+  /* Finance Colors */
+  --finance-income: var(--neon-green);
+  --finance-expense: var(--neon-red);
+  --finance-neutral: var(--neon-cyan);
+  --finance-warning: var(--neon-orange);
+  
+  /* Calendar Colors */
+  --calendar-today: var(--neon-pink);
+  --calendar-event: var(--neon-purple);
+  --calendar-reminder: var(--neon-yellow);
+  
+  /* Shadcn/UI Overrides */
+  --background: var(--bg-darker);
+  --foreground: var(--text-primary);
+  --card: var(--bg-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-card);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--neon-pink);
+  --primary-foreground: var(--text-primary);
+  --secondary: var(--bg-card-hover);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--bg-card);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--neon-purple);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--neon-red);
+  --destructive-foreground: var(--text-primary);
+  --border: var(--border-subtle);
+  --input: var(--bg-card-hover);
+  --ring: var(--neon-pink);
+  
+  /* Chart Colors */
+  --chart-1: var(--neon-pink);
+  --chart-2: var(--neon-cyan);
+  --chart-3: var(--neon-purple);
+  --chart-4: var(--neon-yellow);
+  --chart-5: var(--neon-green);
+  
+  /* Sidebar */
+  --sidebar: var(--bg-darkest);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--neon-pink);
+  --sidebar-primary-foreground: var(--text-primary);
+  --sidebar-accent: var(--bg-card);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border-subtle);
+  --sidebar-ring: var(--neon-pink);
+  
+  /* Radius */
+  --radius: 0.75rem;
+}
+
+/* ============================================================================
+   BASE STYLES
+   ============================================================================ */
+
+.neon-gamer-theme {
+  background-color: var(--bg-darker);
+  color: var(--text-primary);
+}
+
+/* Selection */
+.neon-gamer-theme ::selection {
+  background-color: oklch(0.75 0.22 350 / 40%);
+  color: var(--text-primary);
+}
+
+/* Scrollbar */
+.neon-gamer-theme ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.neon-gamer-theme ::-webkit-scrollbar-track {
+  background: var(--bg-darker);
+}
+
+.neon-gamer-theme ::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+.neon-gamer-theme ::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-pink);
+}
+
+/* ============================================================================
+   NEON GLOW UTILITIES
+   ============================================================================ */
+
+.glow-pink {
+  box-shadow: var(--glow-pink);
+}
+
+.glow-cyan {
+  box-shadow: var(--glow-cyan);
+}
+
+.glow-purple {
+  box-shadow: var(--glow-purple);
+}
+
+.glow-yellow {
+  box-shadow: var(--glow-yellow);
+}
+
+.glow-green {
+  box-shadow: var(--glow-green);
+}
+
+.glow-red {
+  box-shadow: var(--glow-red);
+}
+
+/* Text Glow */
+.text-glow-pink {
+  text-shadow: var(--text-glow-pink);
+}
+
+.text-glow-cyan {
+  text-shadow: var(--text-glow-cyan);
+}
+
+.text-glow-purple {
+  text-shadow: var(--text-glow-purple);
+}
+
+/* ============================================================================
+   GAMER CARD COMPONENT
+   ============================================================================ */
+
+.gamer-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  transition: all 0.3s ease;
+}
+
+.gamer-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-default);
+}
+
+.gamer-card-pink:hover {
+  border-color: oklch(0.75 0.22 350 / 50%);
+  box-shadow: var(--glow-pink);
+}
+
+.gamer-card-cyan:hover {
+  border-color: oklch(0.80 0.16 195 / 50%);
+  box-shadow: var(--glow-cyan);
+}
+
+.gamer-card-purple:hover {
+  border-color: oklch(0.65 0.24 290 / 50%);
+  box-shadow: var(--glow-purple);
+}
+
+/* ============================================================================
+   NEON BUTTON STYLES
+   ============================================================================ */
+
+.btn-neon {
+  position: relative;
+  padding: 0.625rem 1.25rem;
+  font-weight: 600;
+  border-radius: var(--radius);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.btn-neon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.btn-neon:hover::before {
+  opacity: 1;
+}
+
+.btn-neon-pink {
+  background: linear-gradient(135deg, var(--neon-pink), oklch(0.68 0.20 350));
+  color: white;
+}
+
+.btn-neon-pink:hover {
+  box-shadow: var(--glow-pink);
+  transform: translateY(-1px);
+}
+
+.btn-neon-cyan {
+  background: linear-gradient(135deg, var(--neon-cyan), oklch(0.72 0.14 195));
+  color: var(--bg-darker);
+}
+
+.btn-neon-cyan:hover {
+  box-shadow: var(--glow-cyan);
+  transform: translateY(-1px);
+}
+
+.btn-neon-purple {
+  background: linear-gradient(135deg, var(--neon-purple), oklch(0.58 0.22 290));
+  color: white;
+}
+
+.btn-neon-purple:hover {
+  box-shadow: var(--glow-purple);
+  transform: translateY(-1px);
+}
+
+.btn-neon-ghost {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+}
+
+.btn-neon-ghost:hover {
+  border-color: var(--neon-pink);
+  box-shadow: var(--glow-pink);
+}
+
+/* ============================================================================
+   KANBAN BOARD STYLES
+   ============================================================================ */
+
+.kanban-column {
+  background: var(--bg-surface);
+  border-radius: var(--radius);
+  min-height: 400px;
+}
+
+.kanban-column-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  font-weight: 600;
+}
+
+.kanban-column-backlog .kanban-column-header {
+  border-left: 4px solid var(--status-backlog);
+}
+
+.kanban-column-doing .kanban-column-header {
+  border-left: 4px solid var(--status-doing);
+}
+
+.kanban-column-done .kanban-column-header {
+  border-left: 4px solid var(--status-done);
+}
+
+.kanban-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.875rem;
+  margin: 0.5rem;
+  cursor: grab;
+  transition: all 0.2s ease;
+}
+
+.kanban-card:hover {
+  border-color: var(--neon-pink);
+  box-shadow: var(--glow-pink);
+}
+
+.kanban-card.dragging {
+  opacity: 0.8;
+  transform: rotate(2deg);
+  box-shadow: var(--glow-cyan);
+}
+
+/* ============================================================================
+   CALENDAR STYLES
+   ============================================================================ */
+
+.calendar-day {
+  border: 1px solid var(--border-subtle);
+  min-height: 100px;
+  padding: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.calendar-day:hover {
+  background: var(--bg-card-hover);
+}
+
+.calendar-day-today {
+  background: oklch(0.75 0.22 350 / 10%);
+  border-color: var(--neon-pink);
+}
+
+.calendar-day-today::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--neon-pink);
+  box-shadow: var(--glow-pink);
+}
+
+.calendar-event {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.calendar-event:hover {
+  transform: translateX(2px);
+  box-shadow: var(--glow-purple);
+}
+
+.calendar-event-pink {
+  background: oklch(0.75 0.22 350 / 20%);
+  border-left: 3px solid var(--neon-pink);
+}
+
+.calendar-event-cyan {
+  background: oklch(0.80 0.16 195 / 20%);
+  border-left: 3px solid var(--neon-cyan);
+}
+
+.calendar-event-purple {
+  background: oklch(0.65 0.24 290 / 20%);
+  border-left: 3px solid var(--neon-purple);
+}
+
+/* ============================================================================
+   CHAT INTERFACE STYLES
+   ============================================================================ */
+
+.chat-container {
+  background: var(--bg-darkest);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+}
+
+.chat-message {
+  padding: 1rem;
+  border-radius: var(--radius);
+  max-width: 85%;
+  animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-message-user {
+  background: linear-gradient(135deg, var(--neon-purple), oklch(0.58 0.22 290));
+  margin-left: auto;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-message-assistant {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  margin-right: auto;
+  border-bottom-left-radius: 4px;
+}
+
+.chat-input-container {
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-subtle);
+  padding: 1rem;
+}
+
+.chat-input {
+  background: var(--bg-darker);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.chat-input:focus {
+  outline: none;
+  border-color: var(--neon-pink);
+  box-shadow: var(--glow-pink);
+}
+
+/* ============================================================================
+   FINANCE DASHBOARD STYLES
+   ============================================================================ */
+
+.finance-balance-card {
+  background: var(--gradient-dva);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.finance-balance-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 40%, oklch(1 0 0 / 10%) 50%, transparent 60%);
+  animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.finance-transaction {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem;
+  border-radius: calc(var(--radius) - 2px);
+  transition: all 0.2s ease;
+}
+
+.finance-transaction:hover {
+  background: var(--bg-card-hover);
+}
+
+.finance-income {
+  color: var(--finance-income);
+}
+
+.finance-expense {
+  color: var(--finance-expense);
+}
+
+/* ============================================================================
+   ACHIEVEMENT STYLES
+   ============================================================================ */
+
+.achievement-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+}
+
+.achievement-badge:hover {
+  transform: scale(1.05);
+}
+
+.achievement-badge-gold {
+  border-color: var(--neon-yellow);
+  box-shadow: var(--glow-yellow);
+}
+
+.achievement-badge-silver {
+  border-color: oklch(0.75 0.02 285);
+  box-shadow: 0 0 15px oklch(0.75 0.02 285 / 40%);
+}
+
+.achievement-badge-bronze {
+  border-color: oklch(0.65 0.12 50);
+  box-shadow: 0 0 15px oklch(0.65 0.12 50 / 40%);
+}
+
+/* ============================================================================
+   PROGRESS INDICATORS
+   ============================================================================ */
+
+.progress-ring {
+  transform: rotate(-90deg);
+}
+
+.progress-ring-bg {
+  stroke: var(--bg-card-hover);
+}
+
+.progress-ring-fill {
+  stroke: url(#progress-gradient);
+  transition: stroke-dashoffset 0.5s ease;
+  filter: drop-shadow(0 0 6px oklch(0.75 0.22 350 / 50%));
+}
+
+.progress-bar-neon {
+  height: 8px;
+  background: var(--bg-card-hover);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-neon-fill {
+  height: 100%;
+  background: var(--gradient-dva);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  box-shadow: 0 0 10px oklch(0.75 0.22 350 / 50%);
+}
+
+/* ============================================================================
+   PRIORITY BADGES
+   ============================================================================ */
+
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.priority-critical {
+  background: oklch(0.65 0.24 25 / 20%);
+  color: var(--priority-critical);
+  border: 1px solid oklch(0.65 0.24 25 / 40%);
+}
+
+.priority-high {
+  background: oklch(0.75 0.18 50 / 20%);
+  color: var(--priority-high);
+  border: 1px solid oklch(0.75 0.18 50 / 40%);
+}
+
+.priority-medium {
+  background: oklch(0.90 0.18 85 / 20%);
+  color: var(--priority-medium);
+  border: 1px solid oklch(0.90 0.18 85 / 40%);
+}
+
+.priority-low {
+  background: oklch(0.80 0.16 195 / 20%);
+  color: var(--priority-low);
+  border: 1px solid oklch(0.80 0.16 195 / 40%);
+}
+
+/* ============================================================================
+   EMPTY STATES
+   ============================================================================ */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty-state-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.empty-state-description {
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+/* ============================================================================
+   ANIMATIONS
+   ============================================================================ */
+
+@keyframes pulse-neon {
+  0%, 100% {
+    box-shadow: 0 0 20px oklch(0.75 0.22 350 / 40%);
+  }
+  50% {
+    box-shadow: 0 0 40px oklch(0.75 0.22 350 / 60%), 0 0 60px oklch(0.75 0.22 350 / 30%);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes rainbow-border {
+  0% { border-color: var(--neon-pink); }
+  33% { border-color: var(--neon-cyan); }
+  66% { border-color: var(--neon-purple); }
+  100% { border-color: var(--neon-pink); }
+}
+
+.animate-pulse-neon {
+  animation: pulse-neon 2s infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-rainbow-border {
+  animation: rainbow-border 4s linear infinite;
+}
+
+/* ============================================================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  :root {
+    --radius: 0.5rem;
+  }
+  
+  .chat-message {
+    max-width: 90%;
+  }
+  
+  .kanban-column {
+    min-height: auto;
+  }
+  
+  .calendar-day {
+    min-height: 60px;
+    padding: 0.25rem;
+  }
+}
+
+/* ============================================================================
+   REDUCED MOTION
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

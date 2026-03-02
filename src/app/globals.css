@@ -1,0 +1,313 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../styles/themes/neon-gamer.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom scrollbar for the app */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-darker);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-pink);
+}
+
+/* Selection */
+::selection {
+  background-color: oklch(0.75 0.22 350 / 40%);
+  color: var(--text-primary);
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: oklch(0.18 0.04 285 / 60%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid oklch(0.35 0.03 285 / 30%);
+}
+
+.glass-card {
+  background: oklch(0.18 0.04 285 / 80%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid oklch(0.35 0.03 285 / 40%);
+}
+
+/* Neon text colors */
+.text-neon-pink {
+  color: var(--neon-pink);
+}
+
+.text-neon-cyan {
+  color: var(--neon-cyan);
+}
+
+.text-neon-purple {
+  color: var(--neon-purple);
+}
+
+.text-neon-green {
+  color: var(--neon-green);
+}
+
+.text-neon-yellow {
+  color: var(--neon-yellow);
+}
+
+.text-neon-orange {
+  color: var(--neon-orange);
+}
+
+.text-neon-red {
+  color: var(--neon-red);
+}
+
+/* Gradient text */
+.gradient-text-dva {
+  background: linear-gradient(135deg, var(--neon-pink) 0%, var(--neon-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-jinx {
+  background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-harley {
+  background: linear-gradient(135deg, var(--neon-pink) 0%, var(--neon-purple) 50%, var(--neon-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Hover glow effects */
+.hover-glow-pink:hover {
+  box-shadow: var(--glow-pink);
+}
+
+.hover-glow-cyan:hover {
+  box-shadow: var(--glow-cyan);
+}
+
+.hover-glow-purple:hover {
+  box-shadow: var(--glow-purple);
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-neon {
+  0%, 100% {
+    box-shadow: 0 0 20px oklch(0.75 0.22 350 / 40%);
+  }
+  50% {
+    box-shadow: 0 0 40px oklch(0.75 0.22 350 / 60%), 0 0 60px oklch(0.75 0.22 350 / 30%);
+  }
+}
+
+@keyframes shimmer {
+  0% { 
+    transform: translateX(-100%); 
+  }
+  100% { 
+    transform: translateX(100%); 
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulse-neon {
+  animation: pulse-neon 2s infinite;
+}
+
+/* Chart colors */
+.chart-pink {
+  fill: var(--neon-pink);
+  stroke: var(--neon-pink);
+}
+
+.chart-cyan {
+  fill: var(--neon-cyan);
+  stroke: var(--neon-cyan);
+}
+
+.chart-purple {
+  fill: var(--neon-purple);
+  stroke: var(--neon-purple);
+}
+
+/* Status colors */
+.status-backlog {
+  background-color: var(--status-backlog);
+}
+
+.status-doing {
+  background-color: var(--status-doing);
+}
+
+.status-done {
+  background-color: var(--status-done);
+}
+
+/* Priority colors */
+.priority-critical {
+  background-color: oklch(0.65 0.24 25 / 20%);
+  color: var(--priority-critical);
+  border: 1px solid oklch(0.65 0.24 25 / 40%);
+}
+
+.priority-high {
+  background-color: oklch(0.75 0.18 50 / 20%);
+  color: var(--priority-high);
+  border: 1px solid oklch(0.75 0.18 50 / 40%);
+}
+
+.priority-medium {
+  background-color: oklch(0.90 0.18 85 / 20%);
+  color: var(--priority-medium);
+  border: 1px solid oklch(0.90 0.18 85 / 40%);
+}
+
+.priority-low {
+  background-color: oklch(0.80 0.16 195 / 20%);
+  color: var(--priority-low);
+  border: 1px solid oklch(0.80 0.16 195 / 40%);
+}
+
+/* Focus styles */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--neon-pink);
+  box-shadow: var(--glow-pink);
+}
+
+/* Card styles */
+.neon-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  transition: all 0.3s ease;
+}
+
+.neon-card:hover {
+  border-color: var(--neon-pink);
+  box-shadow: var(--glow-pink);
+}
+
+/* Button styles */
+.btn-neon-primary {
+  background: linear-gradient(135deg, var(--neon-pink), oklch(0.68 0.20 350));
+  color: white;
+  font-weight: 600;
+  border-radius: var(--radius);
+  padding: 0.625rem 1.25rem;
+  transition: all 0.3s ease;
+}
+
+.btn-neon-primary:hover {
+  box-shadow: var(--glow-pink);
+  transform: translateY(-1px);
+}
+
+.btn-neon-secondary {
+  background: transparent;
+  border: 1px solid var(--neon-cyan);
+  color: var(--neon-cyan);
+  font-weight: 600;
+  border-radius: var(--radius);
+  padding: 0.625rem 1.25rem;
+  transition: all 0.3s ease;
+}
+
+.btn-neon-secondary:hover {
+  background: oklch(0.80 0.16 195 / 10%);
+  box-shadow: var(--glow-cyan);
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none;
+  }
+}
+
+@media (min-width: 769px) {
+  .hide-desktop {
+    display: none;
+  }
+}

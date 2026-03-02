@@ -375,14 +375,28 @@ export function parseActions(response: string): AIAction[] {
   let match;
   while ((match = actionRegex.exec(response)) !== null) {
     const actionType = match[1] as ActionType;
-    const paramsStr = match[2].trim();
+    let paramsStr = match[2].trim();
     
     try {
-      // Parse JSON params
-      const params = JSON.parse(paramsStr);
+      // Try JSON parse first
+      let params = JSON.parse(paramsStr);
       actions.push({ type: actionType, params });
     } catch (e) {
-      console.error('Failed to parse action params:', paramsStr, e);
+      // If JSON fails, try to parse JS object notation
+      try {
+        // Convert JS object notation to JSON
+        // Add quotes around unquoted keys
+        let jsonStr = paramsStr
+          // Add quotes around unquoted keys (key:)
+          .replace(/(\w+)(?=\s*:)/g, '"$1"')
+          // Fix any double-quoted strings that got re-quoted
+          .replace(/""(\w+)""/g, '"$1"');
+        
+        const params = JSON.parse(jsonStr);
+        actions.push({ type: actionType, params });
+      } catch (e2) {
+        console.error('Failed to parse action params:', paramsStr, e2);
+      }
     }
   }
   
@@ -812,11 +826,43 @@ function parseDate(dateStr: string): Date {
   // Check for relative dates
   const lower = dateStr.toLowerCase();
   
-  if (lower === 'today') return new Date();
+  // Parse time from strings like "today at 3pm" or "tomorrow at 3 pm"
+  const timeMatch = lower.match(/(?:today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)?\s*(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  
+  // Base date
+  let baseDate = new Date();
+  
+  // Check for "tomorrow"
+  if (lower.includes('tomorrow')) {
+    baseDate.setDate(baseDate.getDate() + 1);
+  }
+  
+  // Check for "today at X" or "tomorrow at X"
+  if (timeMatch && (lower.includes('today') || lower.includes('tomorrow'))) {
+    let hours = parseInt(timeMatch[1]);
+    const minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+    const meridiem = timeMatch[3]?.toLowerCase();
+    
+    // Convert 12-hour to 24-hour format
+    if (meridiem === 'pm' && hours < 12) {
+      hours += 12;
+    } else if (meridiem === 'am' && hours === 12) {
+      hours = 0;
+    }
+    
+    baseDate.setHours(hours, minutes, 0, 0);
+    return baseDate;
+  }
+  
+  if (lower === 'today') {
+    baseDate.setHours(12, 0, 0, 0);
+    return baseDate;
+  }
+  
   if (lower === 'tomorrow') {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d;
+    baseDate.setDate(baseDate.getDate() + 1);
+    baseDate.setHours(12, 0, 0, 0);
+    return baseDate;
   }
   
   // Check for "in X days"

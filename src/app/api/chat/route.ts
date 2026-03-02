@@ -83,8 +83,15 @@ export async function POST(request: NextRequest) {
       console.error('Failed to save chat messages:', dbError);
     }
 
-    // Remove action blocks from visible response
-    const visibleResponse = assistantResponse.replace(/```action[\s\S]*?```/g, '').trim();
+    // Remove action blocks from visible response - use multiple patterns to be safe
+    let visibleResponse = assistantResponse
+      .replace(/```action\s*\n[\s\S]*?```/g, '')  // Standard format
+      .replace(/```\s*action[\s\S]*?```/g, '')     // Loose whitespace
+      .replace(/```action:[\s\S]*?```/g, '')       // With colon
+      .trim();
+    
+    // Clean up extra blank lines
+    visibleResponse = visibleResponse.replace(/\n{3,}/g, '\n\n').trim();
 
     return NextResponse.json({
       response: visibleResponse,
@@ -176,6 +183,40 @@ function generateFallbackResponse(message: string, context: any): string {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
+  // Check for calendar/event keywords FIRST
+  const calendarKeywords = ['calendar', 'schedule', 'event', 'appointment', 'meeting', 'call', 'meet'];
+  const isCalendarRequest = calendarKeywords.some(kw => lowerMessage.includes(kw)) && 
+                            (lowerMessage.includes('add to') || lowerMessage.includes('put on') || lowerMessage.includes('schedule') || lowerMessage.includes('tomorrow') || lowerMessage.includes('today'));
+
+  // Event creation patterns - check these FIRST
+  if (isCalendarRequest || lowerMessage.includes('add to calendar') || lowerMessage.includes('put on calendar')) {
+    // Extract event title
+    let eventTitle = message;
+    
+    // Remove common prefixes
+    eventTitle = eventTitle.replace(/add to calendar\s*(to\s*)?/i, '');
+    eventTitle = eventTitle.replace(/put on (my\s*)?calendar\s*(to\s*)?/i, '');
+    eventTitle = eventTitle.replace(/schedule\s*(a\s*)?/i, '');
+    eventTitle = eventTitle.replace(/add\s*(an?\s*)?event\s*/i, '');
+    eventTitle = eventTitle.trim();
+
+    // Determine time preference
+    let preferredTime = 'any';
+    if (lowerMessage.includes('morning')) preferredTime = 'morning';
+    else if (lowerMessage.includes('afternoon')) preferredTime = 'midday';
+    else if (lowerMessage.includes('evening')) preferredTime = 'evening';
+
+    return `Got it! I've added **"${eventTitle}"** to your calendar for tomorrow! 📅 Check the Calendar view to see it. :3
+
+\`\`\`action
+CREATE_EVENT: {
+  "title": "${eventTitle}",
+  "startDate": "tomorrow",
+  "preferredTime": "${preferredTime}"
+}
+\`\`\``;
+  }
+
   // Task creation patterns
   const taskPatterns = [
     /add\s+(?:a\s+)?task\s+(?:for\s+)?(.+?)(?:\s+tomorrow|\s+today|$)/i,
@@ -193,7 +234,7 @@ function generateFallbackResponse(message: string, context: any): string {
     if (match) {
       const taskTitle = match[1].trim();
       // Return action block that will be parsed and executed
-      return `Got it! Let me add that task for you~ :3
+      return `Got it! I've added **"${taskTitle}"** to your tasks! Check the Tasks view! ^_^
 
 \`\`\`action
 CREATE_TASK: {
@@ -201,41 +242,14 @@ CREATE_TASK: {
   "dueDate": "${tomorrowStr}",
   "priority": 3
 }
-\`\`\`
-
-I've added **"${taskTitle}"** to your tasks! You can see it in the Tasks view. Want to set a specific priority or due date? ^_^`;
-    }
-  }
-
-  // Event creation patterns
-  const eventPatterns = [
-    /schedule\s+(?:a\s+)?(.+?)(?:\s+for\s+|\s+on\s+|$)/i,
-    /add\s+(?:an?\s+)?event\s+(.+)/i,
-    /(?:meeting|appointment)\s+(.+)/i,
-  ];
-
-  for (const pattern of eventPatterns) {
-    const match = message.match(pattern);
-    if (match) {
-      const eventTitle = match[1].trim();
-      return `Ooh, let's get that on your calendar! :3
-
-\`\`\`action
-CREATE_EVENT: {
-  "title": "${eventTitle}",
-  "startDate": "${tomorrowStr}",
-  "preferredTime": "any"
-}
-\`\`\`
-
-Event **"${eventTitle}"** created! Check the Calendar view to see it. Want to add a time or location? ^_^`;
+\`\`\``;
     }
   }
 
   // Financial queries
   if (lowerMessage.includes('balance') || lowerMessage.includes('money') || lowerMessage.includes('finance')) {
     const balance = context?.finances?.balance || 0;
-    return `Let me check your finances~ :3\n\nYour current balance is **$${balance.toFixed(2)}**.\n\nWant me to help you track an expense or income?`;
+    return `Let me check~ :3\n\nYour current balance is **$${balance.toFixed(2)}**.\n\nWant me to help track an expense or income?`;
   }
 
   // Goals
@@ -243,7 +257,7 @@ Event **"${eventTitle}"** created! Check the Calendar view to see it. Want to ad
     const goalMatch = message.match(/(?:goal|i want to)\s+(.+)/i);
     if (goalMatch) {
       const goalTitle = goalMatch[1].trim();
-      return `That's a great goal! Let me add it~ :3
+      return `That's a great goal! 🎯 I've created **"${goalTitle}"** for you! Check the Goals view! ^_^
 
 \`\`\`action
 CREATE_GOAL: {
@@ -251,9 +265,7 @@ CREATE_GOAL: {
   "targetValue": 10,
   "unit": "steps"
 }
-\`\`\`
-
-Goal **"${goalTitle}"** created! Check the Goals view to track your progress. ^_^`;
+\`\`\``;
     }
   }
 
@@ -266,13 +278,9 @@ Goal **"${goalTitle}"** created! Check the Goals view to track your progress. ^_
 
   // Help
   if (lowerMessage.includes('help')) {
-    return `I'm here to help you stay organized! :3 Here's what I can do:\n\n**Tasks:** "add a task to buy groceries" or "I need to call mom"\n**Events:** "schedule a meeting tomorrow" or "appointment dentist"\n**Finances:** "what's my balance?"\n**Goals:** "I want to learn coding"\n\nWhat would you like to do? ^_^`;
+    return `I'm here to help! :3 Here's what I can do:\n\n**Tasks:** "add a task to buy groceries"\n**Events:** "add to calendar call mom tomorrow"\n**Finances:** "what's my balance?"\n**Goals:** "create a goal to exercise more"\n\nWhat would you like to do? ^_^`;
   }
 
-  // Default - try to interpret as a task
-  if (message.length > 3 && message.length < 100) {
-    return `Hmm, I'm not sure what you mean, but I can help! :3\n\nTry saying:\n- "add a task [what you need to do]"\n- "schedule [event name]"\n- "what's my balance?"\n\nOr tell me what you need and I'll figure it out! ^_^`;
-  }
-
-  return `I'm here to help! :3 Could you tell me more about what you need?\n\nYou can ask me to:\n- Add tasks: "add a task for tomorrow"\n- Schedule events: "schedule a meeting on Friday"\n- Check finances: "what's my balance?"\n- Create goals: "I want to learn coding"\n\nWhat's on your mind? ^_^`;
+  // Default
+  return `Hmm, I'm not sure what you mean! :3\n\nTry:\n- "add to calendar [event]"\n- "add a task [what to do]"\n- "what's my balance?"\n\nI'll figure it out! ^_^`;
 }

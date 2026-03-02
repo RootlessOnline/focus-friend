@@ -31,7 +31,8 @@ interface Message {
 }
 
 interface AIAction {
-  type: string;
+  action?: string;  // API returns 'action'
+  type?: string;    // Or sometimes 'type'
   success: boolean;
   message?: string;
 }
@@ -67,7 +68,7 @@ export function ChatView({ messages, onSendMessage, isLoading }: ChatViewProps) 
     }
   };
 
-  const getActionIcon = (type: string) => {
+  const getActionIcon = (type: string | undefined) => {
     if (!type) return CheckCircle;
     const upperType = type.toUpperCase();
     if (upperType.includes('EVENT') || upperType.includes('CALENDAR')) return Calendar;
@@ -77,6 +78,9 @@ export function ChatView({ messages, onSendMessage, isLoading }: ChatViewProps) 
     if (upperType.includes('PERSON')) return Users;
     return CheckCircle;
   };
+
+  // Get action type from either 'action' or 'type' property
+  const getActionType = (a: AIAction): string => a.action || a.type || 'UNKNOWN';
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] lg:h-screen">
@@ -161,8 +165,9 @@ export function ChatView({ messages, onSendMessage, isLoading }: ChatViewProps) 
                 {/* Actions taken */}
                 {message.actions && message.actions.length > 0 && (
                   <div className={`mt-2 flex flex-wrap gap-2 ${message.role === 'user' ? 'justify-end' : ''}`}>
-                    {message.actions.map((action, i) => {
-                      const Icon = getActionIcon(action.type);
+                    {message.actions.filter(a => a && (a.action || a.type)).map((action, i) => {
+                      const actionType = getActionType(action);
+                      const Icon = getActionIcon(actionType);
                       return (
                         <Badge
                           key={i}
@@ -174,7 +179,7 @@ export function ChatView({ messages, onSendMessage, isLoading }: ChatViewProps) 
                           }`}
                         >
                           <Icon className="w-3 h-3 mr-1" />
-                          {action.type.replace(/_/g, ' ')}
+                          {actionType.replace(/_/g, ' ')}
                           {action.success ? (
                             <CheckCircle className="w-3 h-3 ml-1" />
                           ) : (

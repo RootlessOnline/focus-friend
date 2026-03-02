@@ -390,9 +390,21 @@ export function CalendarView({ events, onCreateEvent, onUpdateEvent, onDeleteEve
             >
               <ChevronLeft className="w-5 h-5" />
             </Button>
-            <h2 className="text-xl font-bold">
-              {format(currentDate, 'MMMM yyyy')}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold">
+                {format(currentDate, 'MMMM yyyy')}
+              </h2>
+              {!isSameMonth(new Date(), currentDate) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentDate(new Date())}
+                  className="text-xs border-neon-cyan text-neon-cyan"
+                >
+                  Today
+                </Button>
+              )}
+            </div>
             <Button
               variant="ghost"
               size="icon"
@@ -428,16 +440,20 @@ export function CalendarView({ events, onCreateEvent, onUpdateEvent, onDeleteEve
                   key={day.toISOString()}
                   onClick={() => setSelectedDate(day)}
                   className={`
-                    aspect-square p-1 border rounded-lg cursor-pointer transition-all
+                    aspect-square p-1 border rounded-lg cursor-pointer transition-all relative
                     ${isSelected ? 'border-neon-pink shadow-[var(--glow-pink)]' : 'border-transparent'}
-                    ${isCurrentDay ? 'bg-neon-pink/10 border-neon-pink' : ''}
-                    ${isCurrentMonth ? 'bg-[var(--bg-card)]' : 'bg-[var(--bg-surface)] opacity-50'}
+                    ${isCurrentDay ? 'bg-gradient-to-br from-neon-pink/20 to-neon-purple/20 border-neon-pink ring-2 ring-neon-pink/30' : ''}
+                    ${isCurrentMonth && !isCurrentDay ? 'bg-[var(--bg-card)]' : ''}
+                    ${!isCurrentMonth ? 'bg-[var(--bg-surface)] opacity-50' : ''}
                     hover:border-neon-cyan hover:shadow-[var(--glow-cyan)]
                   `}
                 >
                   <div className={`text-sm ${isCurrentDay ? 'font-bold text-neon-pink' : ''}`}>
                     {format(day, 'd')}
                   </div>
+                  {isCurrentDay && (
+                    <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-neon-pink animate-pulse" />
+                  )}
                   <div className="mt-1 space-y-0.5 overflow-hidden">
                     {dayEvents.slice(0, 2).map((event) => (
                       <div

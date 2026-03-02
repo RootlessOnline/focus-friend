@@ -364,6 +364,81 @@ export function inferCategory(description: string): TransactionCategory {
 // ============================================================================
 
 import { db } from '../../db';
+import { getCalendarClient, refreshAccessToken, isGoogleConfigured } from '../../google/auth';
+
+/**
+ * Check if user has Google Calendar connected and push event to it
+ */
+async function pushToGoogleCalendar(
+  userId: string, 
+  eventData: {
+    title: string;
+    startDate: Date;
+    endDate?: Date;
+    description?: string;
+    location?: string;
+    isAllDay?: boolean;
+  }
+): Promise<string | null> {
+  if (!isGoogleConfigured()) return null;
+
+  try {
+    const syncToken = await db.syncToken.findUnique({
+      where: {
+        userId_provider: {
+          userId,
+          provider: 'google-calendar',
+        },
+      },
+    });
+
+    if (!syncToken) return null;
+
+    let accessToken = syncToken.accessToken;
+    
+    // Refresh token if expired
+    if (syncToken.expiresAt < new Date()) {
+      const newTokens = await refreshAccessToken(syncToken.refreshToken);
+      if (!newTokens) {
+        console.log('Google token expired, skipping push');
+        return null;
+      }
+      accessToken = newTokens.accessToken;
+      
+      // Update stored tokens
+      await db.syncToken.update({
+        where: { id: syncToken.id },
+        data: {
+          accessToken: newTokens.accessToken,
+          expiresAt: newTokens.expiresAt,
+        },
+      });
+    }
+
+    const calendar = getCalendarClient(accessToken, syncToken.refreshToken);
+
+    // Create event in Google Calendar
+    const response = await calendar.events.insert({
+      calendarId: 'primary',
+      requestBody: {
+        summary: eventData.title,
+        description: eventData.description,
+        location: eventData.location,
+        start: eventData.isAllDay 
+          ? { date: eventData.startDate.toISOString().split('T')[0] }
+          : { dateTime: eventData.startDate.toISOString() },
+        end: eventData.isAllDay 
+          ? { date: (eventData.endDate || eventData.startDate).toISOString().split('T')[0] }
+          : { dateTime: (eventData.endDate || new Date(eventData.startDate.getTime() + 3600000)).toISOString() },
+      },
+    });
+
+    return response.data.id || null;
+  } catch (error) {
+    console.error('Failed to push event to Google Calendar:', error);
+    return null;
+  }
+}
 
 /**
  * Parse action blocks from AI response text
@@ -488,13 +563,28 @@ async function executeAction(action: AIAction, userId: string): Promise<ActionRe
 async function executeCreateEvent(params: CreateEventParams, userId: string): Promise<ActionResult> {
   const startDate = parseDate(params.startDate);
   
+  // Push to Google Calendar if connected
+  const googleEventId = await pushToGoogleCalendar(userId, {
+    title: params.title,
+    startDate,
+    endDate: params.endDate ? parseDate(params.endDate) : undefined,
+    description: params.description,
+    location: params.location,
+    isAllDay: params.isAllDay,
+  });
+  
+  // Add Google event ID to description if created
+  const description = googleEventId 
+    ? `${params.description || ''}\n[google-id:${googleEventId}]`.trim()
+    : params.description;
+  
   const event = await db.event.create({
     data: {
       userId,
       title: params.title,
       startDate,
       endDate: params.endDate ? parseDate(params.endDate) : undefined,
-      description: params.description,
+      description,
       preferredTime: params.preferredTime,
       location: params.location,
       isAllDay: params.isAllDay || false,
@@ -534,7 +624,7 @@ async function executeCreateEvent(params: CreateEventParams, userId: string): Pr
     success: true,
     action: 'CREATE_EVENT',
     data: event,
-    message: `Created event "${params.title}"`,
+    message: `Created event "${params.title}"${googleEventId ? ' (synced to Google Calendar)' : ''}`,
   };
 }
 

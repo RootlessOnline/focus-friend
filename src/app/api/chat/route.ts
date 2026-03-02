@@ -85,13 +85,23 @@ export async function POST(request: NextRequest) {
 
     // Remove action blocks from visible response - use multiple patterns to be safe
     let visibleResponse = assistantResponse
-      .replace(/```action\s*\n[\s\S]*?```/g, '')  // Standard format
-      .replace(/```\s*action[\s\S]*?```/g, '')     // Loose whitespace
-      .replace(/```action:[\s\S]*?```/g, '')       // With colon
+      // Standard format with newline
+      .replace(/```action\s*\n[\s\S]*?```/g, '')  
+      // Loose whitespace variations
+      .replace(/```\s*action[\s\S]*?```/g, '')     
+      // With colon after action
+      .replace(/```action:\s*[\s\S]*?```/g, '')
+      // Action block with specific action name (e.g., CREATE_TASK:)
+      .replace(/```action\s*\n?\s*\w+:\s*\{[\s\S]*?\}\s*```/g, '')
+      // Any remaining code blocks that look like actions
+      .replace(/```\w*\s*\n?\s*CREATE_\w+:[\s\S]*?```/gi, '')
       .trim();
     
-    // Clean up extra blank lines
-    visibleResponse = visibleResponse.replace(/\n{3,}/g, '\n\n').trim();
+    // Clean up extra blank lines and leftover formatting
+    visibleResponse = visibleResponse
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/^\s*\n/gm, '\n')
+      .trim();
 
     return NextResponse.json({
       response: visibleResponse,

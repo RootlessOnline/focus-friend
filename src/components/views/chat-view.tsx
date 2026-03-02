@@ -68,11 +68,13 @@ export function ChatView({ messages, onSendMessage, isLoading }: ChatViewProps) 
   };
 
   const getActionIcon = (type: string) => {
-    if (type.includes('EVENT') || type.includes('CALENDAR')) return Calendar;
-    if (type.includes('TASK')) return CheckSquare;
-    if (type.includes('TRANSACTION') || type.includes('BALANCE')) return Wallet;
-    if (type.includes('GOAL')) return Target;
-    if (type.includes('PERSON')) return Users;
+    if (!type) return CheckCircle;
+    const upperType = type.toUpperCase();
+    if (upperType.includes('EVENT') || upperType.includes('CALENDAR')) return Calendar;
+    if (upperType.includes('TASK')) return CheckSquare;
+    if (upperType.includes('TRANSACTION') || upperType.includes('BALANCE')) return Wallet;
+    if (upperType.includes('GOAL')) return Target;
+    if (upperType.includes('PERSON')) return Users;
     return CheckCircle;
   };
 

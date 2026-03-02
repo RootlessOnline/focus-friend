@@ -654,14 +654,22 @@ async function executeMoveTask(params: MoveTaskParams, userId: string): Promise<
 // ============================================================================
 
 async function executeCreateGoal(params: CreateGoalParams, userId: string): Promise<ActionResult> {
+  // Ensure targetValue is a number
+  let targetValue = params.targetValue;
+  if (typeof targetValue === 'string') {
+    // Try to extract number from string like "52" or "every week"
+    const numMatch = String(targetValue).match(/(\d+)/);
+    targetValue = numMatch ? parseInt(numMatch[1]) : 10;
+  }
+  
   const goal = await db.goal.create({
     data: {
       userId,
       title: params.title,
       description: params.description,
       targetDate: params.targetDate ? parseDate(params.targetDate) : undefined,
-      targetValue: params.targetValue,
-      unit: params.unit,
+      targetValue: targetValue || 10,
+      unit: params.unit || 'steps',
       status: 'active',
       points: 100,
     },
@@ -881,10 +889,40 @@ function parseDate(dateStr: string): Date {
     return d;
   }
   
+  // Check for "in X months"
+  const inMonthsMatch = dateStr.match(/in (\d+) months?/i);
+  if (inMonthsMatch) {
+    const d = new Date();
+    d.setMonth(d.getMonth() + parseInt(inMonthsMatch[1]));
+    return d;
+  }
+  
+  // Check for "in X years"
+  const inYearsMatch = dateStr.match(/in (\d+) years?/i);
+  if (inYearsMatch) {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + parseInt(inYearsMatch[1]));
+    return d;
+  }
+  
   // Check for "next week"
   if (lower === 'next week') {
     const d = new Date();
     d.setDate(d.getDate() + 7);
+    return d;
+  }
+  
+  // Check for "next month"
+  if (lower === 'next month') {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d;
+  }
+  
+  // Check for "next year" or "in a year" or "1 year"
+  if (lower === 'next year' || lower === 'in a year' || lower === '1 year') {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 1);
     return d;
   }
   

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -31,8 +30,8 @@ interface Message {
 }
 
 interface AIAction {
-  action?: string;  // API returns 'action'
-  type?: string;    // Or sometimes 'type'
+  action?: string;
+  type?: string;
   success: boolean;
   message?: string;
 }
@@ -79,13 +78,12 @@ export function ChatView({ messages, onSendMessage, isLoading }: ChatViewProps) 
     return CheckCircle;
   };
 
-  // Get action type from either 'action' or 'type' property
   const getActionType = (a: AIAction): string => a.action || a.type || 'UNKNOWN';
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] lg:h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 lg:p-6 border-b border-[var(--border-subtle)]">
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 flex items-center justify-between p-4 lg:p-6 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]">
         <div className="flex items-center gap-3">
           <div className="relative">
             <Sparkles className="w-8 h-8 text-neon-pink" />
@@ -101,9 +99,9 @@ export function ChatView({ messages, onSendMessage, isLoading }: ChatViewProps) 
         </Badge>
       </div>
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 p-4 lg:p-6" ref={scrollRef}>
-        <div className="max-w-3xl mx-auto space-y-4">
+      {/* Messages - Scrollable */}
+      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
+        <div className="max-w-3xl mx-auto p-4 lg:p-6 space-y-4">
           {/* Welcome message */}
           {messages.length === 0 && (
             <div className="text-center py-12">
@@ -179,7 +177,7 @@ export function ChatView({ messages, onSendMessage, isLoading }: ChatViewProps) 
                           }`}
                         >
                           <Icon className="w-3 h-3 mr-1" />
-                          {actionType.replace(/_/g, ' ')}
+                          {actionType.replace(/_/g, ' ').toLowerCase()}
                           {action.success ? (
                             <CheckCircle className="w-3 h-3 ml-1" />
                           ) : (
@@ -217,8 +215,8 @@ export function ChatView({ messages, onSendMessage, isLoading }: ChatViewProps) 
         </div>
       </ScrollArea>
 
-      {/* Input */}
-      <div className="p-4 lg:p-6 border-t border-[var(--border-subtle)]">
+      {/* Sticky Input - Always visible at bottom */}
+      <div className="flex-shrink-0 sticky bottom-0 bg-[var(--bg-surface)] border-t border-[var(--border-subtle)] p-4 lg:p-6 z-50">
         <div className="max-w-3xl mx-auto">
           <div className="flex gap-2">
             <Input

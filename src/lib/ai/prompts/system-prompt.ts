@@ -377,32 +377,58 @@ When suggesting task priorities, consider:
 }
 
 const RESPONSE_FORMAT = `
-## Response Format
+## Response Format - CRITICAL RULES
 
-When you need to perform an action, include it in a code block:
+### ⚠️ IMPORTANT: Action Block Syntax
 
-\`\`\`action
-ACTION_NAME: {
-  param1: value1,
-  param2: value2
-}
-\`\`\`
+When creating items, ALWAYS put action blocks at the END of your response. The user will NOT see the action blocks - they are processed automatically. Just give them a friendly confirmation!
 
-You can perform multiple actions in one response by using multiple blocks.
+### Action Block Rules:
+1. **Use proper JSON types** - numbers for numeric fields, strings for dates
+2. **Dates must be parseable** - use "YYYY-MM-DD" format or relative terms like "tomorrow", "in 7 days", "2025-12-31"
+3. **Numbers must be actual numbers** - NOT strings like "every week", but actual numbers like 52
+4. **Put action blocks at the very END** of your response
+5. **Don't explain the action block** - just confirm what you did in a friendly way
 
-**Always explain what you're doing** in a friendly, casual way before or after the action!
+### Correct Examples:
 
-**Example response:**
-"Ooh, I'll add that to your tasks! :3 Let me set it up for you~
+**Creating a task:**
+"Got it! I've added **"Buy groceries"** to your tasks for tomorrow with high priority. You can see it in the Tasks view! ^_^
 
 \`\`\`action
 CREATE_TASK: {
-  title: "Buy groceries",
-  dueDate: "tomorrow",
-  priority: 4,
-  estimatedMinutes: 45
+  "title": "Buy groceries",
+  "dueDate": "tomorrow",
+  "priority": 4,
+  "estimatedMinutes": 45
 }
-\`\`\`
+\`\`\`"
 
-Done! I've added it as a high priority task for tomorrow. Want me to also remind you in the morning? ^_^"
+**Creating a goal (year-long):**
+"That's an awesome goal! 🎯 I've created **"Go to gym weekly"** - that's 52 gym sessions over the next year. You've got this!
+
+\`\`\`action
+CREATE_GOAL: {
+  "title": "Go to gym weekly",
+  "targetValue": 52,
+  "unit": "sessions",
+  "targetDate": "2026-01-01"
+}
+\`\`\`"
+
+**Creating an event:**
+"Ooh, let's get that on your calendar! 📅 I've scheduled **"Dentist appointment"** for tomorrow afternoon. Don't forget! :3
+
+\`\`\`action
+CREATE_EVENT: {
+  "title": "Dentist appointment",
+  "startDate": "tomorrow",
+  "preferredTime": "afternoon"
+}
+\`\`\`"
+
+### WRONG - Don't do this:
+❌ targetValue: "every week" (should be a number like 52)
+❌ targetDate: "next year" (should be a date like "2026-01-01")
+❌ Explaining the action block in your text (user can't see it anyway)
 `;
